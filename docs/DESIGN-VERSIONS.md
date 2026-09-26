@@ -34,45 +34,59 @@
 
 ---
 
-## 二、我想切到「浅色方案」
+## 二、我想切回「初版」（当前版本）
 
 ```powershell
-cd E:\CodeAndProj\jiwei
-
-# 恢复该版本涉及的 4 个文件
-git checkout design-pastel -- `
-  packages/ui/src/TimeGrid.tsx `
-  apps/web/src/features/timetable/TimetablePage.tsx `
-  apps/web/src/features/timetable/components/TimetableGrid.tsx `
-  apps/web/src/features/timetable/components/CourseList.tsx
-
-# 恢复浅色方案专用的配色模块（11cbd40 里被删掉了）
-git checkout design-pastel -- packages/ui/src/palette.ts
-
-# 删掉实色方案专用的取色模块
-Remove-Item apps\web\src\lib\courseColor.ts -Force -ErrorAction SilentlyContinue
-
-# 别忘了把 ui 包的导出加回 palette（11cbd40 里被移除了）
-# 手工确认 packages/ui/src/index.ts 里有这一行：
-#   export * from './palette'
+cd E:\CodeAndProj\jiwei; git checkout design-first -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/demoCourses.ts; Remove-Item apps\web\src\lib\courseColor.ts -Force -ErrorAction SilentlyContinue
 ```
 
-可直接粘的一行版：
+## 三、我想切到「实色方案」
+
+```powershell
+cd E:\CodeAndProj\jiwei; git checkout design-solid -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/courseColor.ts; Remove-Item packages\ui\src\palette.ts,apps\web\src\lib\demoCourses.ts -Force -ErrorAction SilentlyContinue
+```
+
+> 注意：`design-solid` 的 `TimetableGrid.tsx` 引用 `lib/courseColor.ts`，
+> 所以必须一起恢复 `courseColor.ts`，否则类型检查会报 `Cannot find module`。
+
+## 四、我想切到「浅色方案」
 
 ```powershell
 cd E:\CodeAndProj\jiwei; git checkout design-pastel -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx packages/ui/src/palette.ts; Remove-Item apps\web\src\lib\courseColor.ts -Force -ErrorAction SilentlyContinue
 ```
 
-## 三、我想切回「实色方案」（当前版本）
+**然后必须手工补一步**（实测过，不补会报错）：
 
-```powershell
-cd E:\CodeAndProj\jiwei; git checkout design-solid -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/courseColor.ts; Remove-Item packages\ui\src\palette.ts -Force -ErrorAction SilentlyContinue
+在 `packages/ui/src/index.ts` 里加回 `export * from './palette'`。
+
+否则 web 包类型检查会报：
+
+```
+error TS2305: Module '"@jiwei/ui"' has no exported member 'paletteFor'
+error TS2305: Module '"@jiwei/ui"' has no exported member 'MUTED_PALETTE'
 ```
 
-## 四、我想切回「初版」
+⚠️ 这个坑容易漏：**只跑 ui 包的类型检查会显示通过**（ui 包自己不引用 `paletteFor`），
+要到 web 包才暴露，若跳过检查就会在浏览器里看到 `paletteFor is not a function`。
+
+---
+
+## 五、切完必须做两件事
 
 ```powershell
-cd E:\CodeAndProj\jiwei; git checkout design-first -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/demoCourses.ts
+# 1) 类型检查（切文件容易漏 import）+ 编码体检
+pnpm typecheck
+node scripts/check-encoding.mjs packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/demoCourses.ts
+
+# 2) 看效果（dev server 会热更新）
+pnpm dev
+```
+
+下面是本文件早期版本的遗留说明，保留以解释 `design-first` 标签为何被重新指向。
+
+---
+
+## 附：早期命令留档（标签已变更，勿直接使用）
 ```
 
 > 初版**存在表头被课程块覆盖的 bug**。如果只想回到"小表头"的观感但不要 bug，
@@ -80,39 +94,44 @@ cd E:\CodeAndProj\jiwei; git checkout design-first -- packages/ui/src/TimeGrid.t
 
 ---
 
-## 五、切完必须做的两件事
+## 五、切完必须做两件事
 
 ```powershell
-# 1) 类型检查（切文件容易漏掉 import，必须验）
+# 1) 类型检查 + 编码体检（切文件容易漏 import，也可能带进坏文件）
 pnpm typecheck
+node scripts/check-encoding.mjs packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/demoCourses.ts
 
 # 2) 看效果（dev server 会自动热更新）
 pnpm dev
 ```
 
-如果类型检查报了 `Cannot find module './palette'` 或 `paletteFor` 未定义，
-说明上面"恢复 palette.ts / 改 index.ts 导出"这两步漏了。
+> `scripts/check-encoding.mjs` 会检查：BOM、替换字符、乱码字符、
+> **注释与标签被并到同一行**（这一项能直接找出语法损坏，本次就是靠它定位的）。
 
 ## 六、只想微调某一项（不用整体回退）
 
+以下按**当前版本（初版观感）**的实际位置标注：
+
 | 想要的效果 | 改哪里 |
 | --- | --- |
-| 节次号更大/更小 | `packages/ui/src/TimeGrid.tsx` → 轴列 `text-[14px]` |
-| 时间字更大/更小 | 同上 → `text-[7px]`（两处：开始、结束） |
-| 星期名更大/更小 | 同上 → 表头 `text-[11px] sm:text-xs` |
-| 日期字更大/更小 | 同上 → 日期行 `text-[9px] sm:text-[10px]` |
-| 行高（每节高度） | 同上 → `--tg-row-h: clamp(2.7rem, 9vw, 3.6rem)` |
-| 轴上文字改成"第 N 节" | `apps/web/src/features/timetable/TimetablePage.tsx` → `buildRows()` 的 `label` |
-| 课程颜色规则 | `apps/web/src/lib/courseColor.ts` → `SEED_COLORS`（常见课固定色）与 `HUE_POOL`（色相池） |
-| 表头不吸顶 | `packages/ui/src/TimeGrid.tsx` → 去掉表头两行的 `sticky top-0`（**保留 `z-30`**，否则表头会被课程块盖住） |
-| 恢复分割线 | 同上 → 给格子加回 `border-b border-l border-border`，并去掉交替底色 |
+| 节次号更大/更小 | `packages/ui/src/TimeGrid.tsx` → 轴列 `text-[10px]` |
+| 时间字更大/更小 | 同上 → 轴列下方 `text-[8px]` |
+| 轴上文字改成纯数字 | `apps/web/src/features/timetable/TimetablePage.tsx` → `buildRows()` 的 `label`（现在写的是 `第 N 节`） |
+| 星期名 / 日期字大小 | `packages/ui/src/TimeGrid.tsx` → 表头 `text-[11px] sm:text-xs`、日期 `text-[9px] sm:text-[10px]` |
+| 行高（每节高度） | 同上 → `--tg-row-h: clamp(2.15rem, 7.2vw, 3.5rem)` |
+| 课程颜色规则 | `apps/web/src/lib/demoCourses.ts` → `COURSE_PALETTE`（10 个色值）与 `colorForTitle()` |
+| 表头不吸顶 | `packages/ui/src/TimeGrid.tsx` → 去掉表头的 `sticky top-0`（**务必保留 `z-30`**） |
+| 去掉分割线 | 同上 → 删掉格子的 `border-b border-l border-border`，改用交替底色 |
+| 去掉时段分组行 | 同上 → 删除 `row.kind === 'group'` 分支；`TimetablePage.buildRows()` 里不再传 `group` |
 
 ---
 
-## 七、为什么 `design-first` 的表头有 bug
+## 七、为什么表头必须有 `z-30`
 
-课程块的 `z-index` 是 10，而初版的表头单元格**既没有定位、也没有 z-index**。
-两者同处一个网格堆叠上下文 → 跨节的大色块（如连上 3 节的实验课）会直接压在表头上面。
+课程块的 `z-index` 是 **10**，而如果表头单元格**既没有定位、也没有 z-index**，
+两者就同处一个网格堆叠上下文 → **跨节的大色块会直接压在表头上面**。
+初版就存在这个 bug（`4163576`）。
 
-修复方式是给表头两行加 `position: sticky` + `z-30`，让它形成独立的堆叠上下文。
-这条修复从 `design-pastel` 起一直保留 —— **无论以后怎么调视觉，都不要去掉 `z-30`**。
+修复方式是给表头加 `position: sticky` + `z-30`，让它形成独立的堆叠上下文。
+
+**无论以后怎么换视觉，都不要去掉 `z-30`；只想去掉吸顶效果的话，删 `sticky top-0` 即可。**
