@@ -4,17 +4,15 @@
  * **不是课表专用组件**：传入"列 + 行 + 块"即可渲染，课表与将来的日程视图共用
  * （docs/ARCHITECTURE.md 7.1）。
  *
- * 实现要点（每一条都是踩过坑之后定下来的）：
+ * 实现要点（这两条都是踩过坑之后定下来的）：
  *
- * 1. **表头必须有自己的 z-index**。课程块是 z-10，而表头单元格若没有定位与 z-index，
- *    两者同处一个网格堆叠上下文，跨节的大块会直接盖住表头 —— 曾出现过这个 bug。
+ * 1. **每个格子都直接是网格项**，不用 `display: contents` 做中间包裹。
+ *    `display: contents` 下的显式 `grid-column/grid-row` 在部分浏览器里定位不可靠，
+ *    会导致整张表错位。
  * 2. **左侧节次轴不做 sticky**，它就是普通的第 1 列网格项。
- *    给"表头 + 轴"整行加 sticky 会让该行脱离原有网格行，把轴列挤出可视区。
- * 3. **显式给出 `gridColumn` / `gridRow`**，不依赖自动摆放；轴、空白格、时间块
- *    共用同一套行号计算，因此必然对齐。
- * 4. **不画分割线**：相邻节次靠交替底色、相邻星期靠留白与今日列高亮区分。
+ *    之前给表头加 `sticky` 会让它脱离原有网格行、把轴列挤走。
  *
- * 响应式：列宽 `minmax(0,1fr)`，手机上 7 天全部塞进一屏、无需横向滑动；
+ * 响应式：列宽用 `minmax(0, 1fr)`，**手机上 7 天全部塞进一屏、不需要横向滑动**；
  * 行高与字号用 `clamp()` 随屏宽收缩。
  */
 import type { CSSProperties, ReactNode } from 'react'
@@ -41,13 +39,12 @@ export interface TimeGridBlock {
 export interface TimeGridRow {
   /** 节次（1 起），与 block.periodStart/periodEnd 对齐 */
   index: number
-  /** 轴列主标题：只写数字（"1"），单位"节"由表头承担，避免窄列被裁切 */
+  /** 行标题，例如 "1" */
   label: string
-  /**
-   * 轴列副标题。含 `-` 时（如 `"08:00-08:45"`）会被**拆成两行**显示：
-   * 轴列很窄，拆行比缩小字号更易读。
-   */
+  /** 行副标题，例如 "08:00" */
   sub?: string
+  /** 分组头：到这里插入一行分组标题（如"上午"） */
+  group?: string
 }
 
 export interface TimeGridColumn {
@@ -55,7 +52,7 @@ export interface TimeGridColumn {
   weekday: number
   /** 列头主标题，例如 "周一" */
   title: string
-  /** 列头副标题（日期），例如 "9/21" */
+  /** 列头副标题，例如 "09-22" */
   sub?: string
   isToday?: boolean
 }
@@ -79,14 +76,14 @@ export function TimeGrid({
   rowHeight,
   className,
 }: TimeGridProps) {
-  const { layoutRows, rowOf, firstBodyGridRow, bodyGridRowCount } = buildRows(rows)
+  const { layoutRows, rowOf, headerRow, firstBodyGridRow, bodyGridRowCount } = buildRows(rows)
 
   const gridStyle: CSSProperties = {
-    // 轴列 + 7 天；列宽可变，因此手机上不需要横向滚动
+    // 轴列随屏宽收缩：手机 2.25rem，桌面 3.5rem
     gridTemplateColumns: 'var(--tg-axis) repeat(7, minmax(0, 1fr))',
     gridTemplateRows: rowHeight
-      ? `auto auto repeat(${bodyGridRowCount}, ${rowHeight}px)`
-      : 'auto auto repeat(var(--tg-rows), var(--tg-row-h))',
+      ? `auto repeat(${bodyGridRowCount}, ${rowHeight}px)`
+      : 'auto repeat(var(--tg-rows), var(--tg-row-h))',
   }
 
   return (
@@ -94,93 +91,69 @@ export function TimeGrid({
       className={clsx('tg-root overflow-hidden', className)}
       style={
         {
-          // 轴列要放下「1 / 08:00 / 08:45」三行，节次号偏大所以行高给足
-          '--tg-axis': 'clamp(2.7rem, 12vw, 3.6rem)',
-          '--tg-row-h': 'clamp(2.7rem, 9vw, 3.6rem)',
+          '--tg-axis': 'clamp(2.1rem, 9vw, 3.5rem)',
+          '--tg-row-h': 'clamp(2.15rem, 7.2vw, 3.5rem)',
           '--tg-rows': bodyGridRowCount,
         } as CSSProperties
       }
     >
       <div className="grid" style={gridStyle}>
-        {/* ① 星期行：左上角空格 + 7 个星期名 */}
+        {/* 表头：左上角空格 + 7 个列头。
+            注意 sticky + z-30 是**必须的**：课程块是 z-10，表头若没有定位与 z-index，
+            跨节的大色块会直接盖住表头（初版就出现过这个 bug）。 */}
         <div
-          className="sticky top-0 z-30 border-b border-border bg-surface-alt"
-          style={{ gridColumn: 1, gridRow: 1 }}
+          className="sticky top-0 z-30 border-b border-border bg-surface"
+          style={{ gridColumn: 1, gridRow: headerRow }}
         />
         {columns.map((col) => (
           <div
             key={`head-${col.weekday}`}
             className={clsx(
-              'sticky top-0 z-30 flex items-end justify-center border-b border-border pb-0.5 pt-1',
-              col.isToday ? 'bg-brand-soft' : 'bg-surface-alt',
+              'sticky top-0 z-30 flex flex-col items-center justify-center border-b border-l border-border bg-surface py-1',
+              col.isToday && 'bg-brand-soft/50',
             )}
-            style={{ gridColumn: col.weekday + 1, gridRow: 1 }}
+            style={{ gridColumn: col.weekday + 1, gridRow: headerRow }}
           >
             <span
               className={clsx(
-                'text-[11px] leading-none sm:text-xs',
-                col.isToday ? 'font-semibold text-brand' : 'font-medium text-ink',
+                'text-[11px] leading-tight sm:text-xs',
+                col.isToday ? 'font-semibold text-brand' : 'text-ink',
               )}
             >
               {col.title}
             </span>
-          </div>
-        ))}
-
-        {/* ② 日期行：与星期行分开，日期不会被星期挤掉 */}
-        <div
-          className="sticky top-0 z-30 border-b border-border bg-surface-alt"
-          style={{ gridColumn: 1, gridRow: 2 }}
-        />
-        {columns.map((col) => (
-          <div
-            key={`date-${col.weekday}`}
-            className={clsx(
-              'sticky top-0 z-30 flex items-start justify-center border-b border-border pb-0.5',
-              col.isToday ? 'bg-brand-soft' : 'bg-surface-alt',
-            )}
-            style={{ gridColumn: col.weekday + 1, gridRow: 2 }}
-          >
             {col.sub ? (
-              <span
-                className={clsx(
-                  'text-[9px] leading-tight sm:text-[10px]',
-                  col.isToday ? 'font-medium text-brand' : 'text-muted',
-                )}
-              >
-                {col.sub}
-              </span>
+              <span className="text-[9px] leading-tight text-muted sm:text-[10px]">{col.sub}</span>
             ) : null}
           </div>
         ))}
 
-        {/* ③ 行：左侧节次轴 + 7 天空白格 */}
+        {/* 行：左侧节次轴 + 7 天空白格 */}
         {layoutRows.map((row) => {
           const gridRow = firstBodyGridRow + row.gridIndex
-          const [startTime, endTime] = row.sub?.split('-') ?? []
+
+          if (row.kind === 'group') {
+            return (
+              <div
+                key={`group-${row.index}-${row.label}`}
+                className="flex items-center border-b border-border bg-surface-alt/70 px-1.5"
+                style={{ gridColumn: '1 / -1', gridRow }}
+              >
+                <span className="text-[10px] font-medium text-muted">{row.label}</span>
+              </div>
+            )
+          }
 
           return (
             <div key={`row-${row.index}`} style={{ display: 'contents' }}>
-              {/* 节次轴：节次号大、时间小。轴上只放数字与时刻，字段名由表头承担 */}
+              {/* 节次轴：普通网格项，不做 sticky */}
               <div
-                className={clsx(
-                  'flex flex-col items-center justify-center gap-[2px] px-0.5 text-center',
-                  row.striped ? 'bg-surface-alt/70' : 'bg-surface-alt/40',
-                )}
+                className="flex flex-col items-center justify-center border-b border-border/70 bg-surface-alt/40 text-muted"
                 style={{ gridColumn: 1, gridRow }}
               >
-                <span className="text-[14px] font-semibold leading-none text-ink sm:text-base">
-                  {row.label}
-                </span>
-                {startTime ? (
-                  <span className="text-[7px] leading-none text-muted sm:text-[8px]">
-                    {startTime}
-                  </span>
-                ) : null}
-                {endTime ? (
-                  <span className="text-[7px] leading-none text-muted/75 sm:text-[8px]">
-                    {endTime}
-                  </span>
+                <span className="text-[10px] leading-none sm:text-[11px]">{row.label}</span>
+                {row.sub ? (
+                  <span className="mt-0.5 text-[8px] leading-none sm:text-[9px]">{row.sub}</span>
                 ) : null}
               </div>
 
@@ -192,15 +165,9 @@ export function TimeGrid({
                   aria-label={`${col.title} 第 ${row.index} 节`}
                   onClick={() => onCellClick?.(col.weekday, row.index)}
                   className={clsx(
-                    'transition-colors',
-                    col.isToday
-                      ? row.striped
-                        ? 'bg-brand-soft/70'
-                        : 'bg-brand-soft/50'
-                      : row.striped
-                        ? 'bg-surface-alt/55'
-                        : 'bg-surface',
-                    onCellClick && 'cursor-pointer hover:bg-brand-soft/80',
+                    'border-b border-l border-border/70 bg-surface transition-colors',
+                    onCellClick && 'cursor-pointer hover:bg-surface-alt',
+                    col.isToday && 'bg-brand-soft/25',
                   )}
                   style={{ gridColumn: col.weekday + 1, gridRow }}
                 />
@@ -209,7 +176,7 @@ export function TimeGrid({
           )
         })}
 
-        {/* ④ 时间块：靠 grid-row 跨节，不需要测量像素高度 */}
+        {/* 时间块：靠 grid-row 跨节，不需要测量像素高度 */}
         {blocks.map((block) => {
           const startIdx = rowOf(block.periodStart)
           const endIdx = rowOf(block.periodEnd)
@@ -217,8 +184,7 @@ export function TimeGrid({
           return (
             <div
               key={block.id}
-              // 左右留一点白，让色块之间有呼吸感（参考图中的窄卡片）
-              className="min-w-0 px-[2px] py-[1.5px]"
+              className="min-w-0 p-[1px]"
               style={{
                 gridColumn: block.weekday + 1,
                 gridRow: `${firstBodyGridRow + startIdx} / ${firstBodyGridRow + endIdx + 1}`,
@@ -229,10 +195,11 @@ export function TimeGrid({
                 type="button"
                 onClick={block.onClick}
                 className={clsx(
-                  'h-full w-full min-w-0 overflow-hidden rounded-md border-l-[3px] px-1 py-0.5 text-left leading-tight',
+                  'h-full w-full min-w-0 overflow-hidden rounded px-0.5 py-0.5 text-left leading-tight sm:px-1',
                   'text-[9px] sm:text-[10px]',
-                  'transition-shadow hover:shadow-sm',
-                  block.muted && 'opacity-50 line-through',
+                  block.muted
+                    ? 'border border-dashed border-border bg-surface-alt text-muted line-through'
+                    : 'border border-transparent text-white shadow-sm',
                   block.onClick ? 'cursor-pointer' : 'cursor-default',
                   block.className,
                 )}
@@ -249,48 +216,61 @@ export function TimeGrid({
 }
 
 interface LayoutRow {
-  /** 节次号（1 起） */
+  kind: 'period' | 'group'
+  /** 节次号；group 行为 -1 */
   index: number
   label: string
   sub?: string
   /** 在本网格里的行序号（0 起，从表头下方第一行算） */
   gridIndex: number
-  /** 行序号是否为奇数 —— 用于交替底色区分相邻节次（替代分割线） */
-  striped: boolean
 }
 
 interface Layout {
   layoutRows: LayoutRow[]
   bodyGridRowCount: number
-  /** 表头行数（星期行 + 日期行），正文从这里之后开始 */
+  headerRow: number
   firstBodyGridRow: number
   /** 节次 → 行序号（0 起，从表头下方算）；缺失返回 null */
   rowOf: (periodIndex: number) => number | null
 }
 
 /**
- * 把节次列表转成网格行序列。
+ * 把"节次列表（可含分组）"转成网格行序列。
  *
- * 表头占 2 行（星期、日期），因此正文首行 = 3。
- * 所有格子都用同一套计算，所以节次轴、空白格、时间块必然对齐。
+ * 返回的 `gridIndex` 是**表头下方**的行序号，实际 grid-row = gridIndex + 2
+ * （第 1 行是表头，CSS 网格行号从 1 开始）。所有格子都用同一套计算，
+ * 因此左侧轴、空白格、时间块三者必然对齐。
  */
 function buildRows(rows: TimeGridRow[]): Layout {
-  const layoutRows: LayoutRow[] = rows.map((row, i) => ({
-    index: row.index,
-    label: row.label,
-    gridIndex: i,
-    striped: i % 2 === 1,
-    ...(row.sub ? { sub: row.sub } : {}),
-  }))
+  const layoutRows: LayoutRow[] = []
+  const periodRowMap = new Map<number, number>()
+  let lastGroup: string | undefined
 
-  const map = new Map<number, number>()
-  for (const r of layoutRows) map.set(r.index, r.gridIndex)
+  for (const row of rows) {
+    if (row.group && row.group !== lastGroup) {
+      layoutRows.push({
+        kind: 'group',
+        index: -1,
+        label: row.group,
+        gridIndex: layoutRows.length,
+      })
+      lastGroup = row.group
+    }
+    periodRowMap.set(row.index, layoutRows.length)
+    layoutRows.push({
+      kind: 'period',
+      index: row.index,
+      label: row.label,
+      gridIndex: layoutRows.length,
+      ...(row.sub ? { sub: row.sub } : {}),
+    })
+  }
 
-  const HEADER_ROWS = 2
   return {
     layoutRows,
     bodyGridRowCount: layoutRows.length,
-    firstBodyGridRow: HEADER_ROWS + 1,
-    rowOf: (periodIndex: number) => map.get(periodIndex) ?? null,
+    headerRow: 1,
+    firstBodyGridRow: 2,
+    rowOf: (periodIndex: number) => periodRowMap.get(periodIndex) ?? null,
   }
 }

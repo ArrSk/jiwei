@@ -19,7 +19,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
 import { useJiwei } from '../../JiweiContext'
 import { useUiStore } from '../../store'
-import { buildDemoCourses } from '../../lib/demoCourses'
+import { buildDemoCourses, colorForTitle } from '../../lib/demoCourses'
 import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
@@ -31,34 +31,27 @@ function periodStartOf(occId: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/**
- * 把作息表转成网格行。
- *
- * 轴列只写**数字**（"1" 而非 "第 1 节"）—— 列宽只有 45px 左右，
- * "第 N 节"会被裁切；"节"的含义由表头承担。
- * 副标题用 `08:00-08:45` 形式传出，由 `TimeGrid` 拆成两行显示。
- */
+/** 把作息表转成网格行（按 上午/下午/晚上 分组） */
 export function buildRows(periods: Period[]): TimeGridRow[] {
   return [...periods]
     .sort((a, b) => a.index - b.index)
     .map((p) => ({
       index: p.index,
       label: String(p.index),
-      sub: `${p.start}-${p.end}`,
+      sub: p.start,
+      ...(p.label ? { group: p.label } : {}),
     }))
 }
 
-/** 生成某一周的 7 个列头（星期名 + 日期，分两行由 TimeGrid 渲染） */
+/** 生成某一周的 7 个列头 */
 export function buildColumns(semester: Semester, week: number, todayStr: string): TimeGridColumn[] {
   return Array.from({ length: 7 }, (_, i) => {
     const weekday = i + 1
     const date = dateForWeek(semester, week, weekday)
-    const [, month, day] = date.split('-')
     return {
       weekday,
       title: `周${WEEKDAY_LABELS[i]}`,
-      // 参考成熟课表的写法：日期用 M/D，比 MM-DD 更短更清爽
-      sub: `${Number(month)}/${Number(day)}`,
+      sub: date.slice(5),
       isToday: date === todayStr,
     }
   })
@@ -202,8 +195,7 @@ export function TimetablePage() {
         ...(value.teacher.trim() ? { teacher: value.teacher.trim() } : {}),
         ...(value.location.trim() ? { location: value.location.trim() } : {}),
       },
-      // 不存颜色：配色由 @jiwei/ui 的 paletteFor(标题) 稳定派生，
-      // 这样用户改课程名后颜色会跟着变，也不会出现"存了颜色但渲染不用"的两套真相。
+      color: colorForTitle(value.title),
       createdAt: at,
       updatedAt: at,
     }
@@ -235,46 +227,36 @@ export function TimetablePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 pb-28 pt-3 sm:px-4">
-      {/* 周次与统计：两行**居中**显示（手机与桌面都把文字放中间） */}
-      <div className="mb-3 flex flex-col items-center gap-2">
-        <div className="text-center">
-          <div className="text-sm font-semibold leading-tight">
-            第 {viewWeek} 周
-            {viewWeek === currentWeek ? (
-              <span className="ml-1 rounded bg-brand-soft px-1 py-0.5 align-middle text-[10px] text-brand">
-                本周
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-0.5 text-[11px] text-muted">
-            {dateForWeek(semester, viewWeek, 1).slice(5)} ~ {dateForWeek(semester, viewWeek, 7).slice(5)}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted">总计</span>
-          <span className="font-semibold text-ink">{blocks.length}</span>
-          <span className="text-muted">门课程</span>
-          <span className="text-border">·</span>
-          <span className="font-semibold text-ink">{activeCount}</span>
-          <span className="text-muted">次课</span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
+      {/* 周导航 */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             aria-label="上一周"
-            className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
             disabled={viewWeek <= 1}
             onClick={() => setWeek(viewWeek - 1)}
           >
             <ChevronLeftIcon className="h-4 w-4" />
           </button>
-          <span className="min-w-[5.5rem] text-center text-xs text-muted">{semester.name}</span>
+          <div className="min-w-[8.5rem] text-center">
+            <div className="text-sm font-semibold">
+              第 {viewWeek} 周
+              {viewWeek === currentWeek ? (
+                <span className="ml-1 rounded bg-brand-soft px-1 py-0.5 text-[10px] text-brand">
+                  本周
+                </span>
+              ) : null}
+            </div>
+            <div className="text-[11px] text-muted">
+              {dateForWeek(semester, viewWeek, 1).slice(5)} ~{' '}
+              {dateForWeek(semester, viewWeek, 7).slice(5)}
+            </div>
+          </div>
           <button
             type="button"
             aria-label="下一周"
-            className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
             disabled={viewWeek >= semester.totalWeeks}
             onClick={() => setWeek(viewWeek + 1)}
           >
@@ -289,6 +271,10 @@ export function TimetablePage() {
               回到本周
             </button>
           ) : null}
+        </div>
+
+        <div className="text-xs text-muted">
+          {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 · {activeCount} 次课
         </div>
       </div>
 
