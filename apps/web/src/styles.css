@@ -115,12 +115,15 @@
     background-color: color-mix(in oklab, var(--color-brand) 13%, var(--color-surface));
   }
 
-  /* 鼠标悬停：底色微亮 + 一圈主题色描边 + 浮起阴影 */
+  /*
+   * 鼠标悬停：**只做轻微的阴影变化**，不加描边。
+   *
+   * 之前用过 inset 主题色描边，实测在浅色底上像"选中态"、比较刺眼，
+   * 与课表整体的柔和调性不符，因此改为：底色极轻微提亮 + 一层柔和投影。
+   */
   .tg-cell--interactive:hover {
-    background-color: color-mix(in oklab, var(--color-brand) 20%, var(--color-surface));
-    box-shadow:
-      inset 0 0 0 1.5px var(--color-brand),
-      0 2px 8px rgb(15 23 42 / 0.16);
+    background-color: color-mix(in oklab, var(--color-brand) 7%, var(--color-surface));
+    box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.06);
     z-index: 20;
   }
 

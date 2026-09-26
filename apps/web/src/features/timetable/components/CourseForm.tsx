@@ -66,23 +66,31 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-xl sm:max-w-md sm:rounded-2xl">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">添加课程</h2>
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 sm:items-center">
+      {/*
+        手机端：**全屏布局**（而不是底部半屏弹层）—— 表单字段多，
+        半屏在小屏上要来回滚动，全屏一次能看全，且底部按钮固定不随滚动跑掉。
+        桌面端：仍然是居中弹窗。
+      */}
+      <div className="flex h-full w-full flex-col bg-surface shadow-xl sm:h-auto sm:max-h-[92dvh] sm:max-w-md sm:rounded-2xl">
+        {/* 头部固定 */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <h2 className="text-base font-semibold sm:text-sm">添加课程</h2>
           <button
             type="button"
-            className="rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-alt"
+            className="rounded-md px-3 py-1.5 text-sm text-muted hover:bg-surface-alt sm:text-xs"
             onClick={onClose}
           >
             取消
           </button>
         </div>
 
-        <div className="space-y-3 text-sm">
+        {/* 主体可滚动；手机上输入框加大到 44px 触摸高度 */}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 text-base [&_input]:min-h-[44px] [&_select]:min-h-[44px] sm:space-y-3 sm:text-sm sm:[&_input]:min-h-0 sm:[&_select]:min-h-0">
           <Field label="课程名称">
+            {/* 手机上不自动聚焦：会立刻弹起键盘，把刚打开的布局顶乱 */}
             <input
-              autoFocus
+              autoFocus={!isTouchDevice()}
               className="w-full"
               placeholder="例如：高等数学"
               value={value.title}
@@ -90,7 +98,8 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* 手机上一行一个，宽屏才并排 */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
             <Field label="老师（可选）">
               <input
                 className="w-full"
@@ -110,7 +119,7 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
           </div>
 
           <Field label="星期">
-            <div className="flex flex-wrap gap-1">
+            <div className="grid grid-cols-7 gap-1">
               {WEEKDAY_LABELS.map((label, i) => {
                 const weekday = i + 1
                 const active = value.weekday === weekday
@@ -119,7 +128,7 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
                     key={weekday}
                     type="button"
                     className={
-                      'h-8 w-9 rounded-md border text-xs transition-colors ' +
+                      'h-11 rounded-md border text-sm transition-colors sm:h-9 sm:text-xs ' +
                       (active
                         ? 'border-brand bg-brand text-white'
                         : 'border-border bg-surface hover:bg-surface-alt')
@@ -133,7 +142,7 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
             </div>
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4 sm:gap-3">
             <Field label="开始节次">
               <select
                 className="w-full"
@@ -162,10 +171,7 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
             </Field>
           </div>
 
-          <Field
-            label={`周次（共 ${totalWeeks} 周）`}
-            hint="支持 1-16、1,3,5、1-16单、1-16双"
-          >
+          <Field label={`周次（共 ${totalWeeks} 周）`} hint="支持 1-16、1,3,5、1-16单、1-16双">
             <input
               className="w-full"
               placeholder="1-16"
@@ -173,13 +179,15 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
               onChange={(e) => patch({ weeksText: e.target.value })}
             />
           </Field>
+        </div>
 
-          {error ? <p className="text-xs text-danger">{error}</p> : null}
-
+        {/* 底部操作区固定；手机端留出 Home Indicator 安全区 */}
+        <div className="shrink-0 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {error ? <p className="mb-2 text-xs text-danger">{error}</p> : null}
           <button
             type="button"
             disabled={busy}
-            className="w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-white disabled:opacity-60"
+            className="w-full rounded-lg bg-brand py-3 text-sm font-medium text-white disabled:opacity-60 sm:py-2.5"
             onClick={() => void handleSubmit()}
           >
             {busy ? '保存中…' : '保存'}
@@ -188,6 +196,12 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
       </div>
     </div>
   )
+}
+
+/** 触屏设备：用媒体查询判断，比 UA 嗅探可靠 */
+function isTouchDevice(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false
+  return window.matchMedia('(hover: none)').matches
 }
 
 function Field({

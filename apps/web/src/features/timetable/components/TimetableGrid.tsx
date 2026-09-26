@@ -38,9 +38,9 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
         },
         // 关键：课程名与地点都**不允许截断**（不加 truncate），
         // 手机上要能完整显示课程全名——换行比截断重要。
-        // 层级：课程名（醒目）→ 地点（次要，带 @）→ 老师（仅宽屏）。
+        // 文字横向居中；层级：课程名（醒目）→ 地点（次要，带 @）→ 老师（仅宽屏）。
         content: (
-          <span className="flex h-full min-w-0 flex-col gap-[1px] overflow-hidden">
+          <span className="flex h-full min-w-0 flex-col items-center gap-[1px] overflow-hidden text-center">
             <span className="font-semibold [overflow-wrap:anywhere]">{block.title}</span>
             {block.detail?.location ? (
               <span className="opacity-90 [overflow-wrap:anywhere]">@{block.detail.location}</span>
