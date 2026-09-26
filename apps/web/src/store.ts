@@ -1,0 +1,54 @@
+/**
+ * 界面状态（Zustand）。
+ *
+ * 刻意只放"界面状态"，不放业务数据 —— 业务数据一律经 `@jiwei/data` 仓储读取，
+ * 避免出现"两处各存一份课表、互相同步"的经典烂摊子。
+ */
+import { create } from 'zustand'
+import type { Semester } from '@jiwei/core'
+
+export interface Toast {
+  id: string
+  text: string
+  kind: 'info' | 'success' | 'error'
+}
+
+interface UiState {
+  /** 当前模块（外壳导航用）。M0 只有 timetable。 */
+  activeModuleId: string
+  setActiveModuleId: (id: string) => void
+
+  /** 当前正在查看的学期；null 表示"跟随活跃学期" */
+  semester: Semester | null
+  setSemester: (semester: Semester | null) => void
+
+  /**
+   * 正在查看的教学周。
+   * `null` 表示"跟随今天"（打开时自动定位到当前周）；用户手动翻周后才变成具体数字。
+   */
+  week: number | null
+  setWeek: (week: number | null) => void
+
+  toasts: Toast[]
+  toast: (text: string, kind?: Toast['kind']) => void
+  dismissToast: (id: string) => void
+}
+
+export const useUiStore = create<UiState>((set) => ({
+  activeModuleId: 'timetable',
+  setActiveModuleId: (id) => set({ activeModuleId: id }),
+
+  semester: null,
+  setSemester: (semester) => set({ semester, week: null }),
+
+  week: null,
+  setWeek: (week) => set({ week }),
+
+  toasts: [],
+  toast: (text, kind = 'info') => {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    set((s) => ({ toasts: [...s.toasts, { id, text, kind }] }))
+    setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 3200)
+  },
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+}))

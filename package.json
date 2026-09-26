@@ -1,0 +1,18 @@
+{
+  "name": "jiwei",
+  "private": true,
+  "version": "0.1.0",
+  "description": "几微 · 大学生日常生活 App（首版：课程表）",
+  "packageManager": "pnpm@11.8.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @jiwei/web dev",
+    "build": "pnpm --filter @jiwei/web build",
+    "preview": "pnpm --filter @jiwei/web preview",
+    "test": "pnpm --filter @jiwei/core test && pnpm --filter @jiwei/data test",
+    "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/data --noEmit && tsc -p packages/ui --noEmit && tsc -p packages/platform --noEmit && tsc -p apps/web --noEmit",
+    "verify": "pwsh -File scripts/verify.ps1"
+  }
+}

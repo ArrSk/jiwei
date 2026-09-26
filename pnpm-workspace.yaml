@@ -1,0 +1,34 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# ─────────────────────────────────────────────────────────────
+# 本机网络到 registry.npmjs.org 的 TLS 连接不稳定
+# （间歇性 ECONNRESET，元数据请求常在 60 秒时被掐断）。
+# 以下设置用于把重试与超时拉高、降低并发以减少被重置的概率。
+# 注意：pnpm 11 起这些设置只能写在这里，不能写在 .npmrc（后者只认 registry/认证）。
+# ─────────────────────────────────────────────────────────────
+fetchRetries: 8
+fetchRetryMintimeout: 15000
+fetchRetryMaxtimeout: 300000
+fetchTimeout: 600000
+networkConcurrency: 3
+childConcurrency: 2
+fetchMinSpeedKiBps: 0
+fetchWarnTimeoutMs: 0
+
+# 新发布的包默认要等 1 天（pnpm 11 的供应链保护）。本地开发不需要，关掉。
+minimumReleaseAge: 0
+
+# pnpm 11 默认在每次执行脚本前校验依赖状态（verifyDepsBeforeRun: install）。
+# 该校验内部会再跑一次 install，而 install 会因为下面的 esbuild 情况返回非零码，
+# 导致 `pnpm typecheck` / `pnpm test` 这类命令根本无法启动。依赖已确认完整，故关闭。
+verifyDepsBeforeRun: false
+
+# esbuild 需要执行 postinstall 才能提供本地二进制，Vite / Vitest 依赖它。
+# 显式放行这一个包；其余依赖保持 pnpm 11 的默认拦截，避免扩大攻击面。
+#
+# 注意：如果这里不设置，pnpm 会以非零码退出（ERR_PNPM_IGNORED_BUILDS），
+# 其报错文本会被误读成"安装失败"，实际依赖已经装好了。这是本次踩过的坑。
+allowBuilds:
+  esbuild: true

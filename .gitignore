@@ -1,0 +1,31 @@
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+*.local
+
+# 本地数据库导出/备份
+data/
+*.db
+*.db-journal
+
+# 原生外壳构建产物（Capacitor，M5 起）
+android/
+ios/
+.capacitor/
+
+# 编辑器 / 系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 本地验证输出（scripts/verify.ps1 的产物）
+verify-report.txt

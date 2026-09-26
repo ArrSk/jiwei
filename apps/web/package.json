@@ -1,0 +1,35 @@
+{
+  "name": "@jiwei/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "几微客户端：React PWA（同时也是 Capacitor 原生外壳的输入工程）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jiwei/core": "workspace:*",
+    "@jiwei/data": "workspace:*",
+    "@jiwei/platform": "workspace:*",
+    "@jiwei/ui": "workspace:*",
+    "date-fns": "^4.1.0",
+    "dexie": "^4.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.16",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tailwindcss": "^4.1.16",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.12",
+    "vite-plugin-pwa": "^1.1.0"
+  }
+}

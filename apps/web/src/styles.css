@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+/*
+ * 主题令牌。Tailwind v4 的 @theme 会把 --color-* 变成可用的工具类
+ * （bg-surface / text-muted / border-border …），dark 模式通过 <html data-theme="dark"> 切换。
+ */
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-alt: #f1f5f9;
+  --color-canvas: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-brand: #4f46e5;
+  --color-brand-soft: #e0e7ff;
+  --color-danger: #dc2626;
+
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
+}
+
+:root[data-theme='dark'] {
+  --color-surface: #1e293b;
+  --color-surface-alt: #334155;
+  --color-canvas: #0f172a;
+  --color-border: #334155;
+  --color-ink: #e2e8f0;
+  --color-muted: #94a3b8;
+  --color-brand: #818cf8;
+  --color-brand-soft: #312e81;
+  --color-danger: #f87171;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* 移动端安全区（iPhone 刘海 / 底部横条） */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* 紧凑一些的表单基础样式，避免每个输入框都写一遍类名 */
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 1px;
+  }
+}

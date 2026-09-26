@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@jiwei/core": ["../../packages/core/src/index.ts"],
+      "@jiwei/data": ["../../packages/data/src/index.ts"],
+      "@jiwei/ui": ["../../packages/ui/src/index.ts"],
+      "@jiwei/platform": ["../../packages/platform/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+}
