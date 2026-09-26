@@ -109,5 +109,5 @@ export function buildDemoCourses(semester: Semester): Block[] {
   )
 }
 
-// 课程配色统一由 `@jiwei/ui` 的 paletteFor(标题) 派生，
+// 课程配色统一由 `lib/courseColor.ts` 的 colorForTitle(课程名) 派生，
 // 这里不再维护第二套色板（避免两处颜色不一致）。

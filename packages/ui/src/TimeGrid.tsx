@@ -94,9 +94,9 @@ export function TimeGrid({
       className={clsx('tg-root overflow-hidden', className)}
       style={
         {
-          // 轴列要放下「1 / 08:00 / 08:45」三行
-          '--tg-axis': 'clamp(2.6rem, 12vw, 3.6rem)',
-          '--tg-row-h': 'clamp(2.35rem, 8vw, 3.4rem)',
+          // 轴列要放下「1 / 08:00 / 08:45」三行，节次号偏大所以行高给足
+          '--tg-axis': 'clamp(2.7rem, 12vw, 3.6rem)',
+          '--tg-row-h': 'clamp(2.7rem, 9vw, 3.6rem)',
           '--tg-rows': bodyGridRowCount,
         } as CSSProperties
       }
@@ -111,14 +111,14 @@ export function TimeGrid({
           <div
             key={`head-${col.weekday}`}
             className={clsx(
-              'sticky top-0 z-30 flex items-end justify-center border-b border-border pb-0.5 pt-1.5',
+              'sticky top-0 z-30 flex items-end justify-center border-b border-border pb-0.5 pt-1',
               col.isToday ? 'bg-brand-soft' : 'bg-surface-alt',
             )}
             style={{ gridColumn: col.weekday + 1, gridRow: 1 }}
           >
             <span
               className={clsx(
-                'text-[12px] leading-none sm:text-sm',
+                'text-[11px] leading-none sm:text-xs',
                 col.isToday ? 'font-semibold text-brand' : 'font-medium text-ink',
               )}
             >
@@ -136,7 +136,7 @@ export function TimeGrid({
           <div
             key={`date-${col.weekday}`}
             className={clsx(
-              'sticky top-0 z-30 flex items-start justify-center border-b border-border pb-1',
+              'sticky top-0 z-30 flex items-start justify-center border-b border-border pb-0.5',
               col.isToday ? 'bg-brand-soft' : 'bg-surface-alt',
             )}
             style={{ gridColumn: col.weekday + 1, gridRow: 2 }}
@@ -144,8 +144,8 @@ export function TimeGrid({
             {col.sub ? (
               <span
                 className={clsx(
-                  'rounded px-1 text-[10px] leading-tight sm:text-[11px]',
-                  col.isToday ? 'font-semibold text-brand' : 'text-muted',
+                  'text-[9px] leading-tight sm:text-[10px]',
+                  col.isToday ? 'font-medium text-brand' : 'text-muted',
                 )}
               >
                 {col.sub}
@@ -161,24 +161,24 @@ export function TimeGrid({
 
           return (
             <div key={`row-${row.index}`} style={{ display: 'contents' }}>
-              {/* 节次轴：节次号 + 开始 + 结束，三行竖排 */}
+              {/* 节次轴：节次号大、时间小。轴上只放数字与时刻，字段名由表头承担 */}
               <div
                 className={clsx(
-                  'flex flex-col items-center justify-center gap-[1px] px-0.5 text-center',
+                  'flex flex-col items-center justify-center gap-[2px] px-0.5 text-center',
                   row.striped ? 'bg-surface-alt/70' : 'bg-surface-alt/40',
                 )}
                 style={{ gridColumn: 1, gridRow }}
               >
-                <span className="text-[11px] font-semibold leading-none text-ink sm:text-xs">
+                <span className="text-[14px] font-semibold leading-none text-ink sm:text-base">
                   {row.label}
                 </span>
                 {startTime ? (
-                  <span className="text-[8px] leading-none text-muted sm:text-[10px]">
+                  <span className="text-[7px] leading-none text-muted sm:text-[8px]">
                     {startTime}
                   </span>
                 ) : null}
                 {endTime ? (
-                  <span className="text-[8px] leading-none text-muted/75 sm:text-[10px]">
+                  <span className="text-[7px] leading-none text-muted/75 sm:text-[8px]">
                     {endTime}
                   </span>
                 ) : null}

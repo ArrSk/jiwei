@@ -1,7 +1,8 @@
 /** 课程清单：核对与删除。M1 会升级成"表格批量编辑"。 */
 import { useState } from 'react'
 import { WEEKDAY_LABELS, type Block } from '@jiwei/core'
-import { paletteFor, TrashIcon } from '@jiwei/ui'
+import { TrashIcon } from '@jiwei/ui'
+import { colorForTitle } from '../../../lib/courseColor'
 
 interface Props {
   courses: Block[]
@@ -51,7 +52,7 @@ export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
               {/* 与课表网格共用同一套配色，避免两处颜色不一致 */}
               <span
                 className="h-8 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: paletteFor(course.title).border }}
+                style={{ backgroundColor: colorForTitle(course.title) }}
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{course.title}</div>
