@@ -19,7 +19,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
 import { useJiwei } from '../../JiweiContext'
 import { useUiStore } from '../../store'
-import { buildDemoCourses, colorForTitle } from '../../lib/demoCourses'
+import { buildDemoCourses } from '../../lib/demoCourses'
 import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
@@ -34,29 +34,31 @@ function periodStartOf(occId: string): number {
 /**
  * 把作息表转成网格行。
  *
- * 副标题用 `08:00-08:45` 形式传出去，由 `TimeGrid` 拆成两行显示
- * （轴列很窄，拆行比缩小字号更易读）。
- * 不传 `group`：界面已去掉「上午/下午/晚上」分组行。
+ * 轴列只写**数字**（"1" 而非 "第 1 节"）—— 列宽只有 45px 左右，
+ * "第 N 节"会被裁切；"节"的含义由表头承担。
+ * 副标题用 `08:00-08:45` 形式传出，由 `TimeGrid` 拆成两行显示。
  */
 export function buildRows(periods: Period[]): TimeGridRow[] {
   return [...periods]
     .sort((a, b) => a.index - b.index)
     .map((p) => ({
       index: p.index,
-      label: `第 ${p.index} 节`,
+      label: String(p.index),
       sub: `${p.start}-${p.end}`,
     }))
 }
 
-/** 生成某一周的 7 个列头 */
+/** 生成某一周的 7 个列头（星期名 + 日期，分两行由 TimeGrid 渲染） */
 export function buildColumns(semester: Semester, week: number, todayStr: string): TimeGridColumn[] {
   return Array.from({ length: 7 }, (_, i) => {
     const weekday = i + 1
     const date = dateForWeek(semester, week, weekday)
+    const [, month, day] = date.split('-')
     return {
       weekday,
       title: `周${WEEKDAY_LABELS[i]}`,
-      sub: date.slice(5),
+      // 参考成熟课表的写法：日期用 M/D，比 MM-DD 更短更清爽
+      sub: `${Number(month)}/${Number(day)}`,
       isToday: date === todayStr,
     }
   })
@@ -200,7 +202,8 @@ export function TimetablePage() {
         ...(value.teacher.trim() ? { teacher: value.teacher.trim() } : {}),
         ...(value.location.trim() ? { location: value.location.trim() } : {}),
       },
-      color: colorForTitle(value.title),
+      // 不存颜色：配色由 @jiwei/ui 的 paletteFor(标题) 稳定派生，
+      // 这样用户改课程名后颜色会跟着变，也不会出现"存了颜色但渲染不用"的两套真相。
       createdAt: at,
       updatedAt: at,
     }

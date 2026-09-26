@@ -6,5 +6,6 @@
  */
 export * from './module'
 export * from './TimeGrid'
+export * from './palette'
 export * from './icons'
 export { clsx } from './clsx'
