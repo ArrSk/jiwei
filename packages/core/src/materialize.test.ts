@@ -27,8 +27,9 @@ describe('materializeBlock：curriculum（课表）', () => {
     const occ = materializeBlock(block, ctx)
     expect(occ).toHaveLength(20)
     expect(occ[0]?.date).toBe('2025-09-24') // 第 1 周周三
-    expect(occ[0]?.start).toBe('2025-09-24T10:00:00+08:00')
-    expect(occ[0]?.end).toBe('2025-09-24T11:40:00+08:00')
+    // 默认作息 45+5：第 3 节 09:40-10:25，第 4 节 10:30-11:15
+    expect(occ[0]?.start).toBe('2025-09-24T09:40:00+08:00')
+    expect(occ[0]?.end).toBe('2025-09-24T11:15:00+08:00')
     expect(occ[19]?.date).toBe('2026-02-04') // 第 20 周周三
   })
 
@@ -90,8 +91,9 @@ describe('materializeBlock：curriculum（课表）', () => {
     })
     const occ = materializeBlock(block, ctx)
     expect(occ).toHaveLength(1)
+    // 第 1 节 08:00-08:45 到第 4 节结束 11:15
     expect(occ[0]?.start).toBe('2025-09-23T08:00:00+08:00')
-    expect(occ[0]?.end).toBe('2025-09-23T11:40:00+08:00')
+    expect(occ[0]?.end).toBe('2025-09-23T11:15:00+08:00')
   })
 
   it('作息表缺该节次时返回空数组，而不是静默产出错误时间', () => {
@@ -105,7 +107,7 @@ describe('materializeBlock：curriculum（课表）', () => {
         weeks: [1],
       },
     })
-    const noPeriods = buildDefaultPeriods('other', '2025-09-01T00:00:00+08:00').slice(0, 4)
+    const noPeriods = buildDefaultPeriods('other').slice(0, 4)
     expect(materializeBlock(block, { semester, periods: noPeriods })).toEqual([])
   })
 })
@@ -240,7 +242,7 @@ describe('adjustments：停课与调课', () => {
     expect(occ).toHaveLength(4)
     const moved = occ.find((o) => o.date === '2025-10-04')
     expect(moved?.status).toBe('moved')
-    expect(moved?.start).toBe('2025-10-04T10:00:00+08:00')
+    expect(moved?.start).toBe('2025-10-04T09:40:00+08:00')
     expect(moved?.id).toBe(occurrenceId(block.id, '2025-10-04', 3))
   })
 

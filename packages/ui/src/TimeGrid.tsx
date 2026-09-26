@@ -92,8 +92,9 @@ export function TimeGrid({
       className={clsx('tg-root overflow-hidden', className)}
       style={
         {
-          '--tg-axis': 'clamp(2.1rem, 9vw, 3.5rem)',
-          '--tg-row-h': 'clamp(2.15rem, 7.2vw, 3.5rem)',
+          // 轴列要放下"节次 + 起止时间"，所以比之前宽一点
+          '--tg-axis': 'clamp(3.3rem, 15vw, 4.4rem)',
+          '--tg-row-h': 'clamp(2.3rem, 7.8vw, 3.6rem)',
           '--tg-rows': bodyGridRowCount,
         } as CSSProperties
       }
@@ -101,21 +102,21 @@ export function TimeGrid({
       <div className="grid" style={gridStyle}>
         {/* 表头：左上角空格 + 7 个列头 */}
         <div
-          className="border-b border-border bg-surface"
+          className="border-b-2 border-border bg-surface-alt/60"
           style={{ gridColumn: 1, gridRow: headerRow }}
         />
         {columns.map((col) => (
           <div
             key={`head-${col.weekday}`}
             className={clsx(
-              'flex flex-col items-center justify-center border-b border-l border-border bg-surface py-1',
-              col.isToday && 'bg-brand-soft/50',
+              'flex flex-col items-center justify-center border-b-2 border-l border-border py-1.5',
+              col.isToday ? 'bg-brand-soft' : 'bg-surface-alt/60',
             )}
             style={{ gridColumn: col.weekday + 1, gridRow: headerRow }}
           >
             <span
               className={clsx(
-                'text-[11px] leading-tight sm:text-xs',
+                'text-[11px] font-medium leading-tight sm:text-xs',
                 col.isToday ? 'font-semibold text-brand' : 'text-ink',
               )}
             >
@@ -135,24 +136,31 @@ export function TimeGrid({
             return (
               <div
                 key={`group-${row.index}-${row.label}`}
-                className="flex items-center border-b border-border bg-surface-alt/70 px-1.5"
+                className="flex items-center border-b border-border bg-surface-alt px-1.5"
                 style={{ gridColumn: '1 / -1', gridRow }}
               >
-                <span className="text-[10px] font-medium text-muted">{row.label}</span>
+                <span className="text-[10px] font-semibold tracking-wide text-muted">
+                  {row.label}
+                </span>
               </div>
             )
           }
 
           return (
             <div key={`row-${row.index}`} style={{ display: 'contents' }}>
-              {/* 节次轴：普通网格项，不做 sticky */}
+              {/* 节次轴：普通网格项，不做 sticky。
+                  两行显示「节次」与「起止时间」，让用户不用点开就知道几点上课。 */}
               <div
-                className="flex flex-col items-center justify-center border-b border-border/70 bg-surface-alt/40 text-muted"
+                className="flex flex-col items-center justify-center gap-[1px] border-b border-r border-border bg-surface-alt/50 px-0.5 text-center text-muted"
                 style={{ gridColumn: 1, gridRow }}
               >
-                <span className="text-[10px] leading-none sm:text-[11px]">{row.label}</span>
+                <span className="text-[9px] font-semibold leading-none text-ink/80 sm:text-[10px]">
+                  {row.label}
+                </span>
                 {row.sub ? (
-                  <span className="mt-0.5 text-[8px] leading-none sm:text-[9px]">{row.sub}</span>
+                  <span className="whitespace-nowrap text-[7px] leading-tight tracking-tighter sm:text-[9px] sm:tracking-normal">
+                    {row.sub}
+                  </span>
                 ) : null}
               </div>
 
@@ -164,9 +172,9 @@ export function TimeGrid({
                   aria-label={`${col.title} 第 ${row.index} 节`}
                   onClick={() => onCellClick?.(col.weekday, row.index)}
                   className={clsx(
-                    'border-b border-l border-border/70 bg-surface transition-colors',
-                    onCellClick && 'cursor-pointer hover:bg-surface-alt',
-                    col.isToday && 'bg-brand-soft/25',
+                    'border-b border-l border-border/60 transition-colors',
+                    col.isToday ? 'bg-brand-soft/40' : 'bg-surface',
+                    onCellClick && 'cursor-pointer hover:bg-brand-soft/60',
                   )}
                   style={{ gridColumn: col.weekday + 1, gridRow }}
                 />
@@ -183,7 +191,7 @@ export function TimeGrid({
           return (
             <div
               key={block.id}
-              className="min-w-0 p-[1px]"
+              className="min-w-0 p-[1.5px]"
               style={{
                 gridColumn: block.weekday + 1,
                 gridRow: `${firstBodyGridRow + startIdx} / ${firstBodyGridRow + endIdx + 1}`,
@@ -194,11 +202,12 @@ export function TimeGrid({
                 type="button"
                 onClick={block.onClick}
                 className={clsx(
-                  'h-full w-full min-w-0 overflow-hidden rounded px-0.5 py-0.5 text-left leading-tight sm:px-1',
-                  'text-[9px] sm:text-[10px]',
+                  'h-full w-full min-w-0 overflow-hidden rounded-md px-1 py-0.5 text-left leading-tight shadow-sm',
+                  'text-[9px] ring-1 ring-inset ring-black/10 sm:text-[10px]',
+                  'transition-all hover:shadow-md hover:ring-black/20',
                   block.muted
                     ? 'border border-dashed border-border bg-surface-alt text-muted line-through'
-                    : 'border border-transparent text-white shadow-sm',
+                    : 'text-white',
                   block.onClick ? 'cursor-pointer' : 'cursor-default',
                   block.className,
                 )}

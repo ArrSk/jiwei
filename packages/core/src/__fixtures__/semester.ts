@@ -1,5 +1,5 @@
 /** 测试夹具：固定的学期与作息，保证断言可读、可复现。 */
-import { buildDefaultPeriods, type Block, type Semester } from '../index'
+import { buildPeriodsFromConfig, defaultScheduleConfig, type Block, type Semester } from '../index'
 
 /** 2025-09-22 是周一，方便人工核对日期 */
 export const SEMESTER_START = '2025-09-22'
@@ -15,7 +15,7 @@ export const semester: Semester = {
   updatedAt: '2025-09-01T00:00:00+08:00',
 }
 
-export const periods = buildDefaultPeriods('sem_test', '2025-09-01T00:00:00+08:00')
+export const periods = buildPeriodsFromConfig('sem_test', defaultScheduleConfig())
 
 export const ctx = { semester, periods }
 

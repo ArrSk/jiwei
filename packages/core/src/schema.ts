@@ -77,6 +77,47 @@ export const SemesterConfig = z.object({
 })
 export type SemesterConfig = z.infer<typeof SemesterConfig>
 
+/**
+ * 作息参数：生成作息表的"配方"。
+ *
+ * 为什么不直接让用户填每一节的起止时间：真实学校的作息就是
+ * `节数 × (每节时长 + 课间休息)` 连续排下去的。给四个参数比给 12 组时间好填得多，
+ * 且改「每节时长」时全部节次会一起变。
+ *
+ * 上午 / 下午 / 晚上各自有独立的开始时间与节数，中间的空档（午休）不用显式声明 ——
+ * 它就是"上一段结束"到"下一段开始"之间的间隔。
+ */
+export const ScheduleConfig = z.object({
+  /** 每节课时长（分钟）。默认 45 */
+  periodMinutes: z.number().int().min(20).max(120).default(45),
+  /** 课间休息（分钟）。默认 5 */
+  breakMinutes: z.number().int().min(0).max(60).default(5),
+  morning: z
+    .object({
+      start: TimeStr.default('08:00'),
+      count: z.number().int().min(0).max(8).default(4),
+    })
+    .default({ start: '08:00', count: 4 }),
+  afternoon: z
+    .object({
+      start: TimeStr.default('13:45'),
+      count: z.number().int().min(0).max(8).default(4),
+    })
+    .default({ start: '13:45', count: 4 }),
+  evening: z
+    .object({
+      start: TimeStr.default('19:00'),
+      count: z.number().int().min(0).max(6).default(4),
+    })
+    .default({ start: '19:00', count: 4 }),
+})
+export type ScheduleConfig = z.infer<typeof ScheduleConfig>
+
+/** 与产品默认值一致的作息参数（测试与首次启动都用它） */
+export function defaultScheduleConfig(): ScheduleConfig {
+  return ScheduleConfig.parse({})
+}
+
 // ─────────────────────────────────────────────────────────────
 // Block：唯一"占时间"的实体
 // ─────────────────────────────────────────────────────────────

@@ -31,14 +31,14 @@ function periodStartOf(occId: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** 把作息表转成网格行（按 上午/下午/晚上 分组） */
+/** 把作息表转成网格行（按 上午/下午/晚上 分组，副标题显示起止时间） */
 export function buildRows(periods: Period[]): TimeGridRow[] {
   return [...periods]
     .sort((a, b) => a.index - b.index)
     .map((p) => ({
       index: p.index,
-      label: String(p.index),
-      sub: p.start,
+      label: `第 ${p.index} 节`,
+      sub: `${p.start}-${p.end}`,
       ...(p.label ? { group: p.label } : {}),
     }))
 }
@@ -273,8 +273,14 @@ export function TimetablePage() {
           ) : null}
         </div>
 
-        <div className="text-xs text-muted">
-          {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 · {activeCount} 次课
+        <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted">
+          <span className="truncate">{semester.name}</span>
+          <span className="text-border">·</span>
+          <span className="whitespace-nowrap">共 {semester.totalWeeks} 周</span>
+          <span className="text-border">·</span>
+          <span className="whitespace-nowrap">
+            {blocks.length} 门课 / {activeCount} 次
+          </span>
         </div>
       </div>
 

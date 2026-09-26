@@ -7,23 +7,27 @@
  */
 import { useEffect, useState } from 'react'
 import { describeCapabilities } from '@jiwei/platform'
+import type { Semester } from '@jiwei/core'
 import { useJiwei } from '../JiweiContext'
+import { ScheduleSettings } from './ScheduleSettings'
 
 interface Props {
   onClose: () => void
 }
 
 export function SettingsPage({ onClose }: Props) {
-  const { platform } = useJiwei()
+  const { platform, repos } = useJiwei()
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null>(null)
+  const [semester, setSemester] = useState<Semester | null>(null)
 
   useEffect(() => {
     void (async () => {
       setPersisted(await platform.storage.persisted())
       setEstimate(await platform.storage.estimate())
+      setSemester(await repos.semesters.active())
     })()
-  }, [platform])
+  }, [platform, repos])
 
   const caps = describeCapabilities(platform.capabilities)
 
@@ -40,6 +44,8 @@ export function SettingsPage({ onClose }: Props) {
             关闭
           </button>
         </div>
+
+        {semester ? <ScheduleSettings semester={semester} /> : null}
 
         <section className="mb-4">
           <h3 className="mb-2 text-xs font-medium text-muted">当前平台能力</h3>

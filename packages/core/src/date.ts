@@ -64,6 +64,46 @@ export function timeToMinutes(time: string): number {
   return Number(h) * 60 + Number(m)
 }
 
+/** 当天分钟数 → `HH:mm`（跨零点自动取模） */
+export function minutesToTime(total: number): string {
+  const wrapped = ((total % 1440) + 1440) % 1440
+  const h = Math.floor(wrapped / 60)
+  const m = wrapped % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/** 在 `HH:mm` 上加减分钟 */
+export function addMinutesToTime(time: string, minutes: number): string {
+  return minutesToTime(timeToMinutes(time) + minutes)
+}
+
+/**
+ * 生成一串节次时刻。
+ *
+ * 学校作息的真实形态是：`节数 × (每节时长 + 课间休息)` 连续排下去。
+ * 因此这里只收四个参数，而不是让用户手填每一节的起止时间。
+ *
+ * @example 默认（45 分钟一节课、课间 5 分钟、上午 08:00 起、上午 4 节）
+ *   → 08:00-08:45、08:50-09:35、09:40-10:25、10:30-11:15
+ */
+export function generateSlots(
+  start: string,
+  count: number,
+  durationMinutes: number,
+  breakMinutes: number,
+): Array<{ start: string; end: string }> {
+  const slots: Array<{ start: string; end: string }> = []
+  if (count <= 0 || durationMinutes <= 0) return slots
+  let cursor = timeToMinutes(start)
+  for (let i = 0; i < count; i += 1) {
+    const slotStart = cursor
+    const slotEnd = cursor + durationMinutes
+    slots.push({ start: minutesToTime(slotStart), end: minutesToTime(slotEnd) })
+    cursor = slotEnd + Math.max(0, breakMinutes)
+  }
+  return slots
+}
+
 /**
  * 拼出带时区偏移的 ISO 时刻（用于 `start` / `end`）。
  * 固定用 Asia/Shanghai（UTC+8，无夏令时）——本项目单用户，且学校作息以本地时间为准。
