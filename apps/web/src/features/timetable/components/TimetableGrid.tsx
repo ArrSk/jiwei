@@ -1,4 +1,4 @@
-/** 璇捐〃缃戞牸锛氭妸鏍稿績鏁版嵁鏄犲皠鍒伴€氱敤鐨?`TimeGrid`锛堝悗鑰呬笉璁よ瘑"璇?杩欎釜姒傚康锛夈€?*/
+/** 课表网格：把核心数据映射到通用的 `TimeGrid`（后者不认识"课"这个概念）。 */
 import type { Block, Occurrence } from '@jiwei/core'
 import { TimeGrid, type TimeGridBlock, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
 
@@ -17,32 +17,36 @@ interface Props {
   onCellClick: (weekday: number, periodIndex: number) => void
 }
 
-/** 璇剧▼鍧楃殑棰滆壊锛氫紭鍏堢敤璇剧▼鑷甫棰滆壊锛屽惁鍒欓€€鍥炰腑鎬ц壊 */
+/** 课程块的颜色：优先用课程自带颜色，否则退回中性色 */
 function blockColor(block: Block): string {
   return block.color ?? '#64748b'
 }
 
 export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
-  const gridBlocks: TimeGridBlock[] = blocks.map(({ block, occ, weekday, periodStart, periodEnd }) => ({
-    id: occ.id,
-    weekday,
-    periodStart,
-    periodEnd,
-    muted: occ.status === 'cancelled',
-    style: { backgroundColor: blockColor(block) },
-    content: (
-      // 鎵嬫満涓婁竴鍒楀彧鏈?40px 宸﹀彸锛屽洜姝や俊鎭仛涓夌骇闄嶇骇锛氭爣棰?鈫?鍦扮偣 鈫?鑰佸笀銆?      // 灏忓睆鍙繚鐣欐爣棰樹笌鍦扮偣锛涜€佸笀鍦ㄥ皬灞忛殣钘忥紙甯?`hidden sm:block`锛夈€?      <span className="flex h-full min-w-0 flex-col gap-[1px] overflow-hidden">
-        <span className="truncate font-semibold">{block.title}</span>
-        {block.detail?.location ? (
-          <span className="truncate opacity-90">{block.detail.location}</span>
-        ) : null}
-        {block.detail?.teacher ? (
-          <span className="hidden truncate opacity-80 sm:block">{block.detail.teacher}</span>
-        ) : null}
-        {occ.status === 'moved' ? <span className="mt-auto opacity-90">璋冭</span> : null}
-      </span>
-    ),
-  }))
+  const gridBlocks: TimeGridBlock[] = blocks.map(
+    ({ block, occ, weekday, periodStart, periodEnd }) => ({
+      id: occ.id,
+      weekday,
+      periodStart,
+      periodEnd,
+      muted: occ.status === 'cancelled',
+      style: { backgroundColor: blockColor(block) },
+      // 手机上一列只有约 40px，因此文字做三级降级：标题 → 地点 → 老师。
+      // 小屏只保留标题与地点；老师用 `hidden sm:block` 在大屏才显示。
+      content: (
+        <span className="flex h-full min-w-0 flex-col gap-[1px] overflow-hidden">
+          <span className="truncate font-semibold">{block.title}</span>
+          {block.detail?.location ? (
+            <span className="truncate opacity-90">{block.detail.location}</span>
+          ) : null}
+          {block.detail?.teacher ? (
+            <span className="hidden truncate opacity-80 sm:block">{block.detail.teacher}</span>
+          ) : null}
+          {occ.status === 'moved' ? <span className="mt-auto opacity-90">调课</span> : null}
+        </span>
+      ),
+    }),
+  )
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
