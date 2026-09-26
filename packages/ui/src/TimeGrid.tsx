@@ -203,13 +203,15 @@ export function TimeGrid({
                 className={clsx(
                   // 注意：**不加 truncate**。课程名要换行完整显示，
                   // 截断成"高等数…"在手机上是不可接受的（内容比整齐更重要）。
-                  'block h-full w-full min-w-0 overflow-hidden rounded-md px-1 py-0.5 text-left',
+                  'block h-full w-full min-w-0 overflow-hidden rounded-l-[3px] rounded-r-md',
+                  // 左侧同色竖线 + 极淡外描边：与成熟课表的卡片观感一致
+                  'border-l-[3px] px-1 py-0.5 text-left shadow-[0_1px_2px_rgb(15_23_42/0.06)]',
                   // 手机上每列约 45px，11px 中文每行约 4 字；行高收到 1.15 以多容纳一行
                   'text-[11px] leading-[1.15] sm:text-[12px]',
                   '[overflow-wrap:anywhere]', // 超长英文名也强制断行，不撑破色块
                   block.muted
-                    ? 'border border-dashed border-border bg-surface-alt text-muted line-through'
-                    : 'border border-transparent text-white shadow-sm',
+                    ? 'border-dashed border-border bg-surface-alt text-muted line-through'
+                    : 'border-transparent',
                   block.onClick ? 'cursor-pointer' : 'cursor-default',
                   block.className,
                 )}

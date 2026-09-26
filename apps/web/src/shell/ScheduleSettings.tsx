@@ -1,15 +1,20 @@
 /**
  * 作息时间设置。
  *
- * 用户看到的是「一节多久 / 课间多久 / 上午几点开始 / 各段几节」这几个**配方参数**，
- * 而不是 12 组起止时间 —— 改一个参数，整张作息表连带课表一起重排。
+ * **每节课的起止时间逐条可编辑**——真实作息不是等间隔的
+ * （第 3 节前休 15 分钟、中午午休、下午第一节前休 15 分钟），
+ * 只给"每节时长 + 课间"两个数字永远对不上。
  *
- * 右侧（小屏为下方）实时预览生成结果，用户改完立刻能看到"到底是几点上课"。
+ * 「每节时长」与「课间」保留为**快捷填充工具**：改一个数字，
+ * 可以一键把某一整段按等间隔重排；单节仍可再微调。
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  buildPeriodsFromConfig,
+  addMinutesToTime,
   defaultScheduleConfig,
+  isValidTime,
+  PRESET_TIME_SPECS,
+  type PeriodTimeSpec,
   type ScheduleConfig,
   type Semester,
 } from '@jiwei/core'
@@ -45,29 +50,96 @@ export function ScheduleSettings({ semester }: Props) {
     }
   }, [repos])
 
-  // 实时预览：与保存后落库的是同一个纯函数，因此"所见即所得"
-  const preview = useMemo(() => buildPeriodsFromConfig(semester.id, config), [semester.id, config])
+  const times = config.presetTimes
+  const invalid = useMemo(
+    () => times.some((t) => !isValidTime(t.start) || !isValidTime(t.end) || t.end <= t.start),
+    [times],
+  )
 
-  function patch(part: Partial<ScheduleConfig>): void {
-    setConfig((c) => ({ ...c, ...part }))
+  /** 改某一节的时刻 */
+  function patchPeriod(index: number, part: Partial<PeriodTimeSpec>): void {
+    setConfig((c) => ({
+      ...c,
+      presetTimes: c.presetTimes.map((t) => (t.index === index ? { ...t, ...part } : t)),
+    }))
     setDirty(true)
   }
 
-  function patchSection(
+  /** 某节改了开始时间 → 结束时间按"每节时长"自动补上（用户仍可再改） */
+  function patchStart(index: number, start: string): void {
+    patchPeriod(index, { start, end: addMinutesToTime(start, config.periodMinutes) })
+  }
+
+  function addPeriod(): void {
+    setConfig((c) => {
+      const last = c.presetTimes[c.presetTimes.length - 1]
+      const start = last ? addMinutesToTime(last.end, c.breakMinutes) : '08:00'
+      return {
+        ...c,
+        presetTimes: [
+          ...c.presetTimes,
+          {
+            index: c.presetTimes.length + 1,
+            label: last?.label ?? '上午',
+            start,
+            end: addMinutesToTime(start, c.periodMinutes),
+          },
+        ],
+      }
+    })
+    setDirty(true)
+  }
+
+  function removeLastPeriod(): void {
+    setConfig((c) => ({ ...c, presetTimes: c.presetTimes.slice(0, -1) }))
+    setDirty(true)
+  }
+
+  /** 把某一整段按"每节时长 + 课间"等间隔重排 */
+  function refillSection(
     section: 'morning' | 'afternoon' | 'evening',
-    part: { start?: string; count?: number },
+    label: string,
+    start: string,
   ): void {
-    setConfig((c) => ({ ...c, [section]: { ...c[section], ...part } }))
+    setConfig((c) => {
+      const others = c.presetTimes.filter((t) => t.label !== label)
+      const count = c[section].count
+      const regenerated: PeriodTimeSpec[] = []
+      for (let i = 0; i < count; i += 1) {
+        const s =
+          i === 0
+            ? start
+            : addMinutesToTime(
+                regenerated[i - 1]?.end ?? start,
+                c.breakMinutes,
+              )
+        regenerated.push({
+          index: 0,
+          label,
+          start: s,
+          end: addMinutesToTime(s, c.periodMinutes),
+        })
+      }
+      const merged = [...others, ...regenerated].sort((a, b) => a.start.localeCompare(b.start))
+      return {
+        ...c,
+        presetTimes: merged.map((t, i) => ({ ...t, index: i + 1 })),
+      }
+    })
     setDirty(true)
   }
 
   async function handleSave(): Promise<void> {
+    if (invalid) {
+      toast('有时间不合法：结束时间必须晚于开始时间', 'error')
+      return
+    }
     setBusy(true)
     try {
       const count = await applyScheduleConfig(repos, semester.id, config)
       await refresh()
       setDirty(false)
-      toast(`作息已更新：共 ${count} 节，课表已重新生成`, 'success')
+      toast(`作息已保存：共 ${count} 节，课表已重新生成`, 'success')
     } catch (err) {
       toast(`保存失败：${err instanceof Error ? err.message : String(err)}`, 'error')
     } finally {
@@ -75,15 +147,7 @@ export function ScheduleSettings({ semester }: Props) {
     }
   }
 
-  if (!loaded) {
-    return <p className="text-xs text-muted">正在读取作息…</p>
-  }
-
-  const sections: Array<{ key: 'morning' | 'afternoon' | 'evening'; label: string }> = [
-    { key: 'morning', label: '上午' },
-    { key: 'afternoon', label: '下午' },
-    { key: 'evening', label: '晚上' },
-  ]
+  if (!loaded) return <p className="text-xs text-muted">正在读取作息…</p>
 
   return (
     <section className="mb-5">
@@ -95,14 +159,15 @@ export function ScheduleSettings({ semester }: Props) {
           onClick={() => {
             setConfig(defaultScheduleConfig())
             setDirty(true)
+            toast('已恢复为内置作息（12 节）')
           }}
         >
-          恢复默认
+          恢复内置作息
         </button>
       </div>
 
       <div className="rounded-lg border border-border p-3">
-        {/* 每节时长 + 课间休息 */}
+        {/* ── 快捷填充：每节时长 + 课间 ─────────────────────── */}
         <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
             <p className="mb-1 text-[11px] text-muted">每节时长（分钟）</p>
@@ -111,7 +176,10 @@ export function ScheduleSettings({ semester }: Props) {
                 <Chip
                   key={n}
                   active={config.periodMinutes === n}
-                  onClick={() => patch({ periodMinutes: n })}
+                  onClick={() => {
+                    setConfig((c) => ({ ...c, periodMinutes: n }))
+                    setDirty(true)
+                  }}
                 >
                   {n}
                 </Chip>
@@ -122,7 +190,10 @@ export function ScheduleSettings({ semester }: Props) {
                 max={120}
                 className="w-14 px-1.5 py-1 text-xs"
                 value={config.periodMinutes}
-                onChange={(e) => patch({ periodMinutes: clamp(Number(e.target.value), 20, 120) })}
+                onChange={(e) => {
+                  setConfig((c) => ({ ...c, periodMinutes: clamp(Number(e.target.value), 20, 120) }))
+                  setDirty(true)
+                }}
               />
             </div>
           </div>
@@ -130,7 +201,14 @@ export function ScheduleSettings({ semester }: Props) {
             <p className="mb-1 text-[11px] text-muted">课间休息（分钟）</p>
             <div className="flex flex-wrap gap-1">
               {BREAK_PRESETS.map((n) => (
-                <Chip key={n} active={config.breakMinutes === n} onClick={() => patch({ breakMinutes: n })}>
+                <Chip
+                  key={n}
+                  active={config.breakMinutes === n}
+                  onClick={() => {
+                    setConfig((c) => ({ ...c, breakMinutes: n }))
+                    setDirty(true)
+                  }}
+                >
                   {n}
                 </Chip>
               ))}
@@ -140,66 +218,141 @@ export function ScheduleSettings({ semester }: Props) {
                 max={60}
                 className="w-14 px-1.5 py-1 text-xs"
                 value={config.breakMinutes}
-                onChange={(e) => patch({ breakMinutes: clamp(Number(e.target.value), 0, 60) })}
+                onChange={(e) => {
+                  setConfig((c) => ({ ...c, breakMinutes: clamp(Number(e.target.value), 0, 60) }))
+                  setDirty(true)
+                }}
               />
             </div>
           </div>
         </div>
 
-        {/* 各段起始时间与节数 */}
-        <div className="mb-3 space-y-2">
-          {sections.map(({ key, label }) => (
-            <div key={key} className="flex items-center gap-2">
-              <span className="w-8 shrink-0 text-[11px] text-muted">{label}</span>
-              <input
-                type="time"
-                className="w-[6.2rem] px-1.5 py-1 text-xs"
-                value={config[key].start}
-                onChange={(e) => patchSection(key, { start: e.target.value })}
-              />
-              <span className="text-[11px] text-muted">起，共</span>
-              <input
-                type="number"
-                min={0}
-                max={8}
-                className="w-12 px-1.5 py-1 text-xs"
-                value={config[key].count}
-                onChange={(e) => patchSection(key, { count: clamp(Number(e.target.value), 0, 8) })}
-              />
-              <span className="text-[11px] text-muted">节</span>
-            </div>
-          ))}
-        </div>
-
-        {/* 实时预览 */}
-        <div className="mb-3 rounded-md bg-surface-alt/60 p-2">
-          <p className="mb-1 text-[11px] font-medium text-muted">
-            预览（共 {preview.length} 节）
-            {preview.length === 0 ? '：所有段落节数都是 0' : ''}
+        {/* ── 一键重排某一段 ─────────────────────────────── */}
+        <div className="mb-3 space-y-1.5">
+          <p className="text-[11px] text-muted">
+            一键按「时长 + 课间」重排某一段（会覆盖该段现有时间）：
           </p>
-          <div className="flex flex-wrap gap-1">
-            {preview.map((p) => (
-              <span
-                key={p.id}
-                className="rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] leading-none"
-              >
-                {p.index}. {p.start}-{p.end}
-              </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {(
+              [
+                ['morning', '上午', '08:00'],
+                ['afternoon', '下午', '13:45'],
+                ['evening', '晚上', '18:30'],
+              ] as const
+            ).map(([key, label, start]) => (
+              <div key={key} className="flex items-center gap-1">
+                <span className="text-[11px] text-muted">{label}</span>
+                <input
+                  type="time"
+                  className="w-[5.6rem] px-1 py-0.5 text-[11px]"
+                  value={config[key].start}
+                  onChange={(e) => {
+                    setConfig((c) => ({ ...c, [key]: { ...c[key], start: e.target.value } }))
+                    setDirty(true)
+                  }}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={8}
+                  className="w-10 px-1 py-0.5 text-[11px]"
+                  value={config[key].count}
+                  onChange={(e) => {
+                    setConfig((c) => ({
+                      ...c,
+                      [key]: { ...c[key], count: clamp(Number(e.target.value), 0, 8) },
+                    }))
+                    setDirty(true)
+                  }}
+                />
+                <button
+                  type="button"
+                  className="rounded border border-border px-1.5 py-0.5 text-[11px] hover:bg-surface-alt"
+                  onClick={() => refillSection(key, label, config[key].start || start)}
+                >
+                  重排
+                </button>
+              </div>
             ))}
           </div>
         </div>
 
+        {/* ── 每节时刻逐条编辑（真正的时刻来源）────────────── */}
+        <div className="mb-3">
+          <p className="mb-1 text-[11px] text-muted">
+            每节起止时间（共 {times.length} 节，可逐条修改）
+          </p>
+          <div className="max-h-56 overflow-y-auto rounded-md border border-border">
+            <table className="w-full text-[11px]">
+              <thead className="sticky top-0 bg-surface-alt text-muted">
+                <tr>
+                  <th className="w-10 px-1 py-1 text-left font-medium">节</th>
+                  <th className="px-1 py-1 text-left font-medium">开始</th>
+                  <th className="px-1 py-1 text-left font-medium">结束</th>
+                </tr>
+              </thead>
+              <tbody>
+                {times.map((t) => {
+                  const bad = !isValidTime(t.start) || !isValidTime(t.end) || t.end <= t.start
+                  return (
+                    <tr key={t.index} className="border-t border-border">
+                      <td className="px-1 py-1 text-muted">{t.index}</td>
+                      <td className="px-1 py-1">
+                        <input
+                          type="time"
+                          className="w-[5.6rem] px-1 py-0.5 text-[11px]"
+                          value={t.start}
+                          onChange={(e) => patchStart(t.index, e.target.value)}
+                        />
+                      </td>
+                      <td className="px-1 py-1">
+                        <input
+                          type="time"
+                          className={'w-[5.6rem] px-1 py-0.5 text-[11px] ' + (bad ? 'border-danger' : '')}
+                          value={t.end}
+                          onChange={(e) => patchPeriod(t.index, { end: e.target.value })}
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-1.5 flex gap-2">
+            <button
+              type="button"
+              className="rounded border border-border px-2 py-0.5 text-[11px] hover:bg-surface-alt"
+              onClick={addPeriod}
+            >
+              + 增加一节
+            </button>
+            <button
+              type="button"
+              className="rounded border border-border px-2 py-0.5 text-[11px] hover:bg-surface-alt disabled:opacity-40"
+              disabled={times.length <= 1}
+              onClick={removeLastPeriod}
+            >
+              − 删除最后一节
+            </button>
+          </div>
+        </div>
+
+        {invalid ? (
+          <p className="mb-2 text-[11px] text-danger">结束时间必须晚于开始时间，请修正后再保存。</p>
+        ) : null}
+
         <button
           type="button"
-          disabled={busy || !dirty || preview.length === 0}
+          disabled={busy || !dirty || invalid || times.length === 0}
           className="w-full rounded-lg bg-brand py-2 text-xs font-medium text-white disabled:opacity-50"
           onClick={() => void handleSave()}
         >
           {busy ? '保存中…' : dirty ? '保存并重建课表' : '已是最新'}
         </button>
         <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
-          保存后整张作息表会按新参数重排，课表随之重新生成。
-          由于节次与场次的标识是确定性的，<strong>已有课程不会错位，提醒与笔记也不会失联</strong>。
+          保存后作息表按新时间重排，课表随之重新生成。节次与场次的标识是确定性的，
+          <strong>已有课程不会错位，提醒与笔记也不会失联</strong>。
         </p>
       </div>
     </section>
@@ -235,3 +388,6 @@ function clamp(n: number, min: number, max: number): number {
   if (Number.isNaN(n)) return min
   return Math.min(max, Math.max(min, Math.round(n)))
 }
+
+/** 内置作息常量在界面上也用到（"恢复内置作息"提示）——保留引用避免 tree-shaking 误判 */
+export const BUILTIN_PERIOD_COUNT = PRESET_TIME_SPECS.length

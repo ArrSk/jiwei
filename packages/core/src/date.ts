@@ -78,10 +78,11 @@ export function addMinutesToTime(time: string, minutes: number): string {
 }
 
 /**
- * 生成一串节次时刻。
+ * 生成一串节次时刻（等间隔）。
  *
- * 学校作息的真实形态是：`节数 × (每节时长 + 课间休息)` 连续排下去。
- * 因此这里只收四个参数，而不是让用户手填每一节的起止时间。
+ * 适合"每节时长与课间都统一"的快速生成；真实作息往往不是等间隔
+ * （例如第 3 节前休息 15 分钟、午休、下午第一节前休息 15 分钟），
+ * 那种情况应直接给出每节的起止时间，见 `PeriodTimeSpec` 用法。
  *
  * @example 默认（45 分钟一节课、课间 5 分钟、上午 08:00 起、上午 4 节）
  *   → 08:00-08:45、08:50-09:35、09:40-10:25、10:30-11:15
@@ -102,6 +103,19 @@ export function generateSlots(
     cursor = slotEnd + Math.max(0, breakMinutes)
   }
   return slots
+}
+
+/**
+ * 在每节时长固定的前提下，由开始时间推算结束时间。
+ * 用于"用户填了开始时间，结束时间自动补上"，也用于校验。
+ */
+export function inferEndTime(start: string, durationMinutes: number): string {
+  return addMinutesToTime(start, durationMinutes)
+}
+
+/** `HH:mm` 是否合法（用于表单校验，避免写入 25:00 这类值） */
+export function isValidTime(time: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(time)
 }
 
 /**

@@ -80,17 +80,26 @@ export type SemesterConfig = z.infer<typeof SemesterConfig>
 /**
  * 作息参数：生成作息表的"配方"。
  *
- * 为什么不直接让用户填每一节的起止时间：真实学校的作息就是
- * `节数 × (每节时长 + 课间休息)` 连续排下去的。给四个参数比给 12 组时间好填得多，
- * 且改「每节时长」时全部节次会一起变。
+ * **`presetTimes` 是真正的时刻来源**——每节课的起止时间逐条列出。
+ * 为什么不用"每节时长 + 课间"推导：真实作息并非等间隔
+ * （例如第 3 节前休息 15 分钟、中午午休、下午第一节前休息 15 分钟），
+ * 用公式推导永远对不上。
  *
- * 上午 / 下午 / 晚上各自有独立的开始时间与节数，中间的空档（午休）不用显式声明 ——
- * 它就是"上一段结束"到"下一段开始"之间的间隔。
+ * `periodMinutes` / `breakMinutes` / `morning|afternoon|evening` 是**快捷填充参数**：
+ * 用于"一键按 45 分钟排一整段"，以及新增一节时推算默认起止时间。
  */
+export const PeriodTimeSpec = z.object({
+  index: PeriodIndex,
+  label: z.string().optional(),
+  start: TimeStr,
+  end: TimeStr,
+})
+export type PeriodTimeSpec = z.infer<typeof PeriodTimeSpec>
+
 export const ScheduleConfig = z.object({
-  /** 每节课时长（分钟）。默认 45 */
+  /** 每节课时长（分钟）。默认 45，用于快捷填充与新节次推算 */
   periodMinutes: z.number().int().min(20).max(120).default(45),
-  /** 课间休息（分钟）。默认 5 */
+  /** 课间休息（分钟）。默认 5，用于快捷填充 */
   breakMinutes: z.number().int().min(0).max(60).default(5),
   morning: z
     .object({
@@ -106,16 +115,38 @@ export const ScheduleConfig = z.object({
     .default({ start: '13:45', count: 4 }),
   evening: z
     .object({
-      start: TimeStr.default('19:00'),
+      start: TimeStr.default('18:30'),
       count: z.number().int().min(0).max(6).default(4),
     })
-    .default({ start: '19:00', count: 4 }),
+    .default({ start: '18:30', count: 4 }),
+  /** 每节的真实起止时间。为空表示"尚未逐条设置"，此时由上面的参数生成 */
+  presetTimes: z.array(PeriodTimeSpec).default([]),
 })
 export type ScheduleConfig = z.infer<typeof ScheduleConfig>
 
+/**
+ * 内置默认作息（与参考课表一致）：
+ * 上午 1-5 节、下午 6-9 节、晚上 10-12 节。
+ * 注意它不是等间隔的 —— 第 3 节前休 15 分钟、第 5 节后午休、第 8 节前休 15 分钟。
+ */
+export const PRESET_TIME_SPECS: PeriodTimeSpec[] = [
+  { index: 1, label: '上午', start: '08:00', end: '08:45' },
+  { index: 2, label: '上午', start: '08:50', end: '09:35' },
+  { index: 3, label: '上午', start: '09:50', end: '10:35' },
+  { index: 4, label: '上午', start: '10:40', end: '11:25' },
+  { index: 5, label: '上午', start: '11:30', end: '12:15' },
+  { index: 6, label: '下午', start: '13:45', end: '14:30' },
+  { index: 7, label: '下午', start: '14:35', end: '15:20' },
+  { index: 8, label: '下午', start: '15:35', end: '16:20' },
+  { index: 9, label: '下午', start: '16:25', end: '17:10' },
+  { index: 10, label: '晚上', start: '18:30', end: '19:15' },
+  { index: 11, label: '晚上', start: '19:20', end: '20:05' },
+  { index: 12, label: '晚上', start: '20:10', end: '20:55' },
+]
+
 /** 与产品默认值一致的作息参数（测试与首次启动都用它） */
 export function defaultScheduleConfig(): ScheduleConfig {
-  return ScheduleConfig.parse({})
+  return ScheduleConfig.parse({ presetTimes: PRESET_TIME_SPECS })
 }
 
 // ─────────────────────────────────────────────────────────────

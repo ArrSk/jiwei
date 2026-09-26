@@ -34,6 +34,9 @@ export async function saveScheduleConfig(repos: Repos, config: ScheduleConfig): 
  * 因此重建后节次"身份"不变，`Occurrence` 的 id 也不变，
  * 挂在场次上的提醒与笔记不会失联（见 ADR-004）。
  *
+ * 注意：写回 meta 的配置以**实际落库的作息**为准（回读后再反推 presetTimes），
+ * 避免出现"界面显示的配置"与"数据库里的作息"两套真相。
+ *
  * @returns 新的节次数量
  */
 export async function applyScheduleConfig(
@@ -41,10 +44,18 @@ export async function applyScheduleConfig(
   semesterId: string,
   config: ScheduleConfig,
 ): Promise<number> {
-  const { buildPeriodsFromConfig } = await import('@jiwei/core')
-  const periods = buildPeriodsFromConfig(semesterId, ScheduleConfig.parse(config))
+  const { buildPeriodsFromConfig, buildScheduleConfigFromPeriods, ScheduleConfig } = await import(
+    '@jiwei/core'
+  )
+  const validated = ScheduleConfig.parse(config)
+  const periods = buildPeriodsFromConfig(semesterId, validated)
+  if (periods.length === 0) {
+    throw new Error('作息表不能为空：至少保留一节课')
+  }
+
   await repos.periods.replaceAll(semesterId, periods)
-  await saveScheduleConfig(repos, config)
+  const persisted = await repos.periods.listBySemester(semesterId)
+  await saveScheduleConfig(repos, buildScheduleConfigFromPeriods(persisted, validated))
   await repos.rebuildOccurrences(semesterId)
   return periods.length
 }

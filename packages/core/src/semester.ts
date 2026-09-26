@@ -2,7 +2,13 @@
  * 学期语境下的时间查询：周次、作息表、某周日期。
  * 全部是纯函数，可被前端预览、后端落库、iCal 导出、提醒调度共用。
  */
-import { defaultScheduleConfig, Period, Semester, type ScheduleConfig } from './schema'
+import {
+  defaultScheduleConfig,
+  Period,
+  Semester,
+  type PeriodTimeSpec,
+  type ScheduleConfig,
+} from './schema'
 import {
   addDaysStr,
   combineDateTime,
@@ -77,13 +83,31 @@ export function periodRange(
  * 段落标签由上午/下午/晚上自动带出，界面据此做分组显示。
  */
 export function buildPeriodsFromConfig(semesterId: string, config: ScheduleConfig): Period[] {
+  // 优先用逐条列出的时刻（真实作息，非等间隔）
+  const specs =
+    config.presetTimes.length > 0
+      ? [...config.presetTimes].sort((a, b) => a.index - b.index)
+      : generateSpecsFromSections(config)
+
+  return specs.map((spec, i) => ({
+    id: `${semesterId}_p${i + 1}`,
+    semesterId,
+    index: i + 1,
+    start: spec.start,
+    end: spec.end,
+    ...(spec.label ? { label: spec.label } : {}),
+  }))
+}
+
+/** 由"上午/下午/晚上 + 时长 + 课间"等间隔生成（presetTimes 为空时的回退路径） */
+function generateSpecsFromSections(config: ScheduleConfig): PeriodTimeSpec[] {
   const sections: Array<{ label: string; start: string; count: number }> = [
     { label: '上午', start: config.morning.start, count: config.morning.count },
     { label: '下午', start: config.afternoon.start, count: config.afternoon.count },
     { label: '晚上', start: config.evening.start, count: config.evening.count },
   ]
 
-  const periods: Period[] = []
+  const specs: PeriodTimeSpec[] = []
   for (const section of sections) {
     const slots = generateSlots(
       section.start,
@@ -92,23 +116,40 @@ export function buildPeriodsFromConfig(semesterId: string, config: ScheduleConfi
       config.breakMinutes,
     )
     for (const slot of slots) {
-      periods.push({
-        id: `${semesterId}_p${periods.length + 1}`,
-        semesterId,
-        index: periods.length + 1,
+      specs.push({
+        index: specs.length + 1,
         label: section.label,
         start: slot.start,
         end: slot.end,
       })
     }
   }
-  return periods
+  return specs
 }
 
 /**
- * 生成一套常见作息（第 1~12 节）。
- * 保留这个入口是为了兼容旧调用；新代码请用 `buildPeriodsFromConfig`，
- * 它支持用户自定义时长/课间/起始时间。
+ * 由当前作息表反推配置（用户逐条改完时间后保存时使用）。
+ * 把 `Period[]` 转成 `presetTimes`，保证"所见即所存"。
+ */
+export function buildScheduleConfigFromPeriods(
+  periods: Period[],
+  base: ScheduleConfig,
+): ScheduleConfig {
+  const ordered = [...periods].sort((a, b) => a.index - b.index)
+  return {
+    ...base,
+    presetTimes: ordered.map((p, i) => ({
+      index: i + 1,
+      start: p.start,
+      end: p.end,
+      ...(p.label ? { label: p.label } : {}),
+    })),
+  }
+}
+
+/**
+ * 生成一套默认作息（第 1~12 节，与参考课表一致）。
+ * 保留这个入口是为了兼容旧调用；新代码请用 `buildPeriodsFromConfig`。
  */
 export function buildDefaultPeriods(semesterId: string, _now?: string): Period[] {
   return buildPeriodsFromConfig(semesterId, defaultScheduleConfig())

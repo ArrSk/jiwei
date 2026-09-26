@@ -109,25 +109,5 @@ export function buildDemoCourses(semester: Semester): Block[] {
   )
 }
 
-/** 课表色板：按课程序号循环分配，保证同一份示例里颜色不重复 */
-export const COURSE_PALETTE = [
-  '#4f46e5',
-  '#0ea5e9',
-  '#059669',
-  '#d97706',
-  '#dc2626',
-  '#7c3aed',
-  '#0891b2',
-  '#65a30d',
-  '#db2777',
-  '#ea580c',
-] as const
-
-/** 按标题哈希稳定取色：同一门课每次渲染颜色一致，且不需要用户手动选色 */
-export function colorForTitle(title: string): string {
-  let hash = 0
-  for (let i = 0; i < title.length; i += 1) {
-    hash = (hash * 31 + title.charCodeAt(i)) % 100000
-  }
-  return COURSE_PALETTE[hash % COURSE_PALETTE.length] ?? COURSE_PALETTE[0]
-}
+// 课程配色统一由 `lib/palette.ts` 的 paletteForTitle(课程名) 提供，
+// 这里不再维护第二套色板（避免"存了颜色但渲染不用"的两套真相）。

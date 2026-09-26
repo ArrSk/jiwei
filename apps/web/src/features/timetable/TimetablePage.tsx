@@ -19,7 +19,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
 import { useJiwei } from '../../JiweiContext'
 import { useUiStore } from '../../store'
-import { buildDemoCourses, colorForTitle } from '../../lib/demoCourses'
+import { buildDemoCourses } from '../../lib/demoCourses'
 import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
@@ -34,9 +34,8 @@ function periodStartOf(occId: string): number {
 /**
  * 把作息表转成网格行。
  *
- * 不再传 `group`：界面已去掉「上午/下午/晚上」分组行，
- * 相邻节次改由 `TimeGrid` 的交替浅色区分。
- * （作息数据里的 `period.label` 仍保留，供将来日视图与统计使用。）
+ * 副标题传 `08:00-08:45` 形式，由 `TimeGrid` 拆成两行显示（轴列很窄）。
+ * 时刻来自作息表本身，而作息表可在「设置 → 作息时间」里逐节编辑。
  */
 export function buildRows(periods: Period[]): TimeGridRow[] {
   return [...periods]
@@ -44,7 +43,7 @@ export function buildRows(periods: Period[]): TimeGridRow[] {
     .map((p) => ({
       index: p.index,
       label: String(p.index),
-      sub: p.start,
+      sub: `${p.start}-${p.end}`,
     }))
 }
 
@@ -200,7 +199,8 @@ export function TimetablePage() {
         ...(value.teacher.trim() ? { teacher: value.teacher.trim() } : {}),
         ...(value.location.trim() ? { location: value.location.trim() } : {}),
       },
-      color: colorForTitle(value.title),
+      // 不存颜色：配色由 `lib/palette.ts` 的 paletteForTitle(课程名) 稳定派生，
+      // 避免"存了颜色但渲染不用"的两套真相。
       createdAt: at,
       updatedAt: at,
     }
@@ -232,8 +232,12 @@ export function TimetablePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 pb-28 pt-3 sm:px-4">
-      {/* 周导航 */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      {/*
+        周次标题 + 左右切换 + 统计：**整体居中**（PC 与手机一致）。
+        用纵向排列而不是 justify-between —— 后者会把统计挤到最右侧，
+        视觉上并不居中，之前就是这样被反馈的。
+      */}
+      <div className="mb-3 flex flex-col items-center gap-2">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -244,6 +248,7 @@ export function TimetablePage() {
           >
             <ChevronLeftIcon className="h-4 w-4" />
           </button>
+
           <div className="min-w-[8.5rem] text-center">
             <div className="text-sm font-semibold">
               第 {viewWeek} 周
@@ -258,6 +263,7 @@ export function TimetablePage() {
               {dateForWeek(semester, viewWeek, 7).slice(5)}
             </div>
           </div>
+
           <button
             type="button"
             aria-label="下一周"
@@ -267,6 +273,7 @@ export function TimetablePage() {
           >
             <ChevronRightIcon className="h-4 w-4" />
           </button>
+
           {week !== null ? (
             <button
               type="button"
@@ -278,8 +285,8 @@ export function TimetablePage() {
           ) : null}
         </div>
 
-        <div className="text-xs text-muted">
-          {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 · {activeCount} 次课
+        <div className="text-center text-[11px] text-muted">
+          {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 / {activeCount} 次
         </div>
       </div>
 

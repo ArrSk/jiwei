@@ -45,9 +45,9 @@ describe('semester：周次与作息', () => {
   it('periodRange 从作息表派生时刻（第 3-4 节连堂）', () => {
     const r = periodRange(periods, '2025-09-24', 3, 4)
     expect(r).not.toBeNull()
-    // 默认作息：45 分钟一节、课间 5 分钟，上午 08:00 起 → 第 3 节 09:40-10:25，第 4 节 10:30-11:15
-    expect(r?.start).toBe('2025-09-24T09:40:00+08:00')
-    expect(r?.end).toBe('2025-09-24T11:15:00+08:00')
+    // 内建作息（非等间隔）：第 3 节 09:50-10:35，第 4 节 10:40-11:25
+    expect(r?.start).toBe('2025-09-24T09:50:00+08:00')
+    expect(r?.end).toBe('2025-09-24T11:25:00+08:00')
   })
 
   it('periodRange 遇到不存在的节次返回 null（不静默出错）', () => {
@@ -67,39 +67,41 @@ describe('semester：周次与作息', () => {
     expect(p[0]?.id).toBe('sem_x_p1')
     expect(p[0]?.start).toBe('08:00')
     expect(p[0]?.semesterId).toBe('sem_x')
-    // 上午 / 下午 / 晚上 分组
+    // 上午 / 下午 / 晚上 分组：1-5 上午、6-9 下午、10-12 晚上
     expect(p[0]?.label).toBe('上午')
-    expect(p[8]?.label).toBe('晚上')
+    expect(p[5]?.label).toBe('下午')
+    expect(p[9]?.label).toBe('晚上')
   })
 
-  it('默认作息：45 分钟一节 + 5 分钟课间，上午 08:00、下午 13:45、晚上 19:00', () => {
+  it('内建作息与参考课表一致（非等间隔，共 12 节）', () => {
     const p = buildDefaultPeriods('sem_x')
     expect(p.map((x) => `${x.start}-${x.end}`)).toEqual([
       // 上午
       '08:00-08:45',
       '08:50-09:35',
-      '09:40-10:25',
-      '10:30-11:15',
-      // 下午（13:45 起）
+      '09:50-10:35', // 第 3 节前休 15 分钟
+      '10:40-11:25',
+      '11:30-12:15',
+      // 下午
       '13:45-14:30',
       '14:35-15:20',
-      '15:25-16:10',
-      '16:15-17:00',
-      // 晚上（19:00 起）
-      '19:00-19:45',
-      '19:50-20:35',
-      '20:40-21:25',
-      '21:30-22:15',
+      '15:35-16:20', // 第 8 节前休 15 分钟
+      '16:25-17:10',
+      // 晚上
+      '18:30-19:15',
+      '19:20-20:05',
+      '20:10-20:55',
     ])
   })
 
-  it('作息参数可调：改时长/课间/起始时间后整体重排', () => {
+  it('作息参数可调：改时长/课间/起始时间后整体重排（presetTimes 为空时走等间隔生成）', () => {
     const p = buildPeriodsFromConfig('sem_y', {
       periodMinutes: 50,
       breakMinutes: 10,
       morning: { start: '08:30', count: 2 },
       afternoon: { start: '14:00', count: 1 },
       evening: { start: '19:00', count: 0 },
+      presetTimes: [],
     })
     expect(p).toHaveLength(3)
     expect(p.map((x) => `${x.start}-${x.end}`)).toEqual(['08:30-09:20', '09:30-10:20', '14:00-14:50'])
@@ -117,9 +119,32 @@ describe('semester：周次与作息', () => {
       morning: { start: '08:00', count: 0 },
       afternoon: { start: '13:45', count: 2 },
       evening: { start: '19:00', count: 0 },
+      presetTimes: [],
     })
     expect(p).toHaveLength(2)
     expect(p.every((x) => x.label === '下午')).toBe(true)
+  })
+
+  it('presetTimes 优先于等间隔参数：真实作息允许非等间隔', () => {
+    const p = buildPeriodsFromConfig('sem_p', {
+      periodMinutes: 45,
+      breakMinutes: 5,
+      morning: { start: '08:00', count: 4 },
+      afternoon: { start: '13:45', count: 4 },
+      evening: { start: '18:30', count: 4 },
+      presetTimes: [
+        { index: 1, start: '08:00', end: '08:45' },
+        // 第 2 节前休息 15 分钟（等间隔公式算不出这种情况）
+        { index: 2, start: '09:00', end: '09:45' },
+        { index: 3, start: '13:45', end: '14:30' },
+      ],
+    })
+    expect(p.map((x) => `${x.start}-${x.end}`)).toEqual([
+      '08:00-08:45',
+      '09:00-09:45',
+      '13:45-14:30',
+    ])
+    expect(p.map((x) => x.index)).toEqual([1, 2, 3])
   })
 })
 
