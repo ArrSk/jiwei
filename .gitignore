@@ -5,14 +5,16 @@ build/
 coverage/
 *.local
 
-# 本地数据库导出/备份
-data/
+# 根目录的本地数据（IndexedDB 导出 / 备份）。
+# 必须写前导斜杠：不带斜杠的 `data/` 会匹配任意层级的 data 目录，
+# 从而把 packages/data（源码包！）一并忽略掉。这个坑已经踩过一次。
+/data/
 *.db
 *.db-journal
 
 # 原生外壳构建产物（Capacitor，M5 起）
-android/
-ios/
+/android/
+/ios/
 .capacitor/
 
 # 编辑器 / 系统
