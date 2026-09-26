@@ -31,7 +31,13 @@ function periodStartOf(occId: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** 把作息表转成网格行（按 上午/下午/晚上 分组） */
+/**
+ * 把作息表转成网格行。
+ *
+ * 不再传 `group`：界面已去掉「上午/下午/晚上」分组行，
+ * 相邻节次改由 `TimeGrid` 的交替浅色区分。
+ * （作息数据里的 `period.label` 仍保留，供将来日视图与统计使用。）
+ */
 export function buildRows(periods: Period[]): TimeGridRow[] {
   return [...periods]
     .sort((a, b) => a.index - b.index)
@@ -39,7 +45,6 @@ export function buildRows(periods: Period[]): TimeGridRow[] {
       index: p.index,
       label: String(p.index),
       sub: p.start,
-      ...(p.label ? { group: p.label } : {}),
     }))
 }
 

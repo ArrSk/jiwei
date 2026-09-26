@@ -9,6 +9,8 @@
   --color-surface-alt: #f1f5f9;
   --color-canvas: #f8fafc;
   --color-border: #e2e8f0;
+  /* 课表网格用的极淡分割线：比 --color-border 更浅，避免线条抢视觉 */
+  --color-border-soft: #eef2f7;
   --color-ink: #0f172a;
   --color-muted: #64748b;
   --color-brand: #4f46e5;
@@ -25,6 +27,7 @@
   --color-surface-alt: #334155;
   --color-canvas: #0f172a;
   --color-border: #334155;
+  --color-border-soft: #263143;
   --color-ink: #e2e8f0;
   --color-muted: #94a3b8;
   --color-brand: #818cf8;
@@ -71,3 +74,60 @@
     outline-offset: 1px;
   }
 }
+
+@layer components {
+  /*
+   * 课表空白格。
+   *
+   * 设计取舍：底色**不**用多个 `bg-*` Tailwind 类互相覆盖
+   * （哪个生效取决于它们在产物 CSS 里的先后顺序，不可控），
+   * 而是由这里统一给出，UI 包只负责输出语义类名。
+   */
+  .tg-cell {
+    background-color: var(--color-surface);
+    transition:
+      box-shadow 120ms ease,
+      background-color 120ms ease;
+  }
+
+  /* 隔行浅色：相邻两节用不同底色区分，比分割线更柔和 */
+  .tg-cell--alt {
+    background-color: color-mix(in oklab, var(--color-surface-alt) 55%, var(--color-surface));
+  }
+
+  /* 今天那一整列：淡淡的主题色底 */
+  .tg-cell--today {
+    background-color: color-mix(in oklab, var(--color-brand) 8%, var(--color-surface));
+  }
+
+  .tg-cell--today.tg-cell--alt {
+    background-color: color-mix(in oklab, var(--color-brand) 13%, var(--color-surface));
+  }
+
+  /* 鼠标悬停：底色微亮 + 一圈主题色描边 + 浮起阴影 */
+  .tg-cell--interactive:hover {
+    background-color: color-mix(in oklab, var(--color-brand) 20%, var(--color-surface));
+    box-shadow:
+      inset 0 0 0 1.5px var(--color-brand),
+      0 2px 8px rgb(15 23 42 / 0.16);
+    z-index: 20;
+  }
+
+  /*
+   * 网格分割线统一调淡。
+   *
+   * 为什么不用 `border-border-soft` 这类工具类：`@theme` 定义在**本文件**，
+   * 而 TimeGrid 位于 packages/ui —— Tailwind 对跨包源码的主题令牌解析不一致，
+   * 实测该工具类根本没有被生成（变量有、类没有）。
+   * 因此这里直接用属性选择器覆盖，不依赖主题令牌。
+   */
+  [class*='border-border'] {
+    border-color: color-mix(in oklab, var(--color-border) 45%, transparent);
+  }
+
+  /* 表头下方的分隔线保留一点存在感，否则表头与表格会糊在一起 */
+  .tg-grid [class*='border-border'] {
+    border-color: color-mix(in oklab, var(--color-border) 60%, transparent);
+  }
+}
+
