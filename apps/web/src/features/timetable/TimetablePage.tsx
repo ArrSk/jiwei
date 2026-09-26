@@ -31,7 +31,13 @@ function periodStartOf(occId: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** 把作息表转成网格行（按 上午/下午/晚上 分组，副标题显示起止时间） */
+/**
+ * 把作息表转成网格行。
+ *
+ * 副标题用 `08:00-08:45` 形式传出去，由 `TimeGrid` 拆成两行显示
+ * （轴列很窄，拆行比缩小字号更易读）。
+ * 不传 `group`：界面已去掉「上午/下午/晚上」分组行。
+ */
 export function buildRows(periods: Period[]): TimeGridRow[] {
   return [...periods]
     .sort((a, b) => a.index - b.index)
@@ -39,7 +45,6 @@ export function buildRows(periods: Period[]): TimeGridRow[] {
       index: p.index,
       label: `第 ${p.index} 节`,
       sub: `${p.start}-${p.end}`,
-      ...(p.label ? { group: p.label } : {}),
     }))
 }
 
@@ -227,36 +232,46 @@ export function TimetablePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 pb-28 pt-3 sm:px-4">
-      {/* 周导航 */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      {/* 周次与统计：两行**居中**显示（手机与桌面都把文字放中间） */}
+      <div className="mb-3 flex flex-col items-center gap-2">
+        <div className="text-center">
+          <div className="text-sm font-semibold leading-tight">
+            第 {viewWeek} 周
+            {viewWeek === currentWeek ? (
+              <span className="ml-1 rounded bg-brand-soft px-1 py-0.5 align-middle text-[10px] text-brand">
+                本周
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-0.5 text-[11px] text-muted">
+            {dateForWeek(semester, viewWeek, 1).slice(5)} ~ {dateForWeek(semester, viewWeek, 7).slice(5)}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted">总计</span>
+          <span className="font-semibold text-ink">{blocks.length}</span>
+          <span className="text-muted">门课程</span>
+          <span className="text-border">·</span>
+          <span className="font-semibold text-ink">{activeCount}</span>
+          <span className="text-muted">次课</span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             aria-label="上一周"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
+            className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
             disabled={viewWeek <= 1}
             onClick={() => setWeek(viewWeek - 1)}
           >
             <ChevronLeftIcon className="h-4 w-4" />
           </button>
-          <div className="min-w-[8.5rem] text-center">
-            <div className="text-sm font-semibold">
-              第 {viewWeek} 周
-              {viewWeek === currentWeek ? (
-                <span className="ml-1 rounded bg-brand-soft px-1 py-0.5 text-[10px] text-brand">
-                  本周
-                </span>
-              ) : null}
-            </div>
-            <div className="text-[11px] text-muted">
-              {dateForWeek(semester, viewWeek, 1).slice(5)} ~{' '}
-              {dateForWeek(semester, viewWeek, 7).slice(5)}
-            </div>
-          </div>
+          <span className="min-w-[5.5rem] text-center text-xs text-muted">{semester.name}</span>
           <button
             type="button"
             aria-label="下一周"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
+            className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
             disabled={viewWeek >= semester.totalWeeks}
             onClick={() => setWeek(viewWeek + 1)}
           >
@@ -271,16 +286,6 @@ export function TimetablePage() {
               回到本周
             </button>
           ) : null}
-        </div>
-
-        <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted">
-          <span className="truncate">{semester.name}</span>
-          <span className="text-border">·</span>
-          <span className="whitespace-nowrap">共 {semester.totalWeeks} 周</span>
-          <span className="text-border">·</span>
-          <span className="whitespace-nowrap">
-            {blocks.length} 门课 / {activeCount} 次
-          </span>
         </div>
       </div>
 
