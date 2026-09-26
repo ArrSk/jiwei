@@ -89,8 +89,10 @@ export function TimeGrid({
       className={clsx('tg-root tg-grid overflow-hidden', className)}
       style={
         {
-          '--tg-axis': 'clamp(2.1rem, 9vw, 3.5rem)',
-          '--tg-row-h': 'clamp(2.15rem, 7.2vw, 3.5rem)',
+          // 轴列要放下「1 / 08:00 / 08:45」三行（字号已调大到接近参考图）
+          '--tg-axis': 'clamp(2.7rem, 13vw, 3.7rem)',
+          // 行高：给换行的课程名留出空间，同时保证相邻两节仍有区分度
+          '--tg-row-h': 'clamp(3rem, 10.5vw, 4.2rem)',
           '--tg-rows': bodyGridRowCount,
         } as CSSProperties
       }
@@ -107,21 +109,24 @@ export function TimeGrid({
           <div
             key={`head-${col.weekday}`}
             className={clsx(
-              'sticky top-0 z-30 flex flex-col items-center justify-center border-b border-l border-border py-1',
+              'sticky top-0 z-30 flex flex-col items-center justify-center gap-[2px] border-b border-l border-border py-1',
               col.isToday ? 'bg-brand-soft/50' : 'bg-surface-alt',
             )}
             style={{ gridColumn: col.weekday + 1, gridRow: headerRow }}
           >
+            {/* 表头两行：星期名大、日期小（参考成熟课表的层级） */}
             <span
               className={clsx(
-                'text-[11px] leading-tight sm:text-xs',
-                col.isToday ? 'font-semibold text-brand' : 'text-ink',
+                'text-[12px] leading-none sm:text-[13px]',
+                col.isToday ? 'font-semibold text-brand' : 'font-medium text-ink',
               )}
             >
               {col.title}
             </span>
             {col.sub ? (
-              <span className="text-[9px] leading-tight text-muted sm:text-[10px]">{col.sub}</span>
+              <span className="text-[10px] leading-none text-muted sm:text-[11px]">
+                {col.sub}
+              </span>
             ) : null}
           </div>
         ))}
@@ -130,20 +135,29 @@ export function TimeGrid({
             相邻节次用**交替浅色**区分（比分割线更柔和），鼠标悬停的格子浮起阴影作为反馈。 */}
         {layoutRows.map((row) => {
           const gridRow = firstBodyGridRow + row.gridIndex
+          const [startTime, endTime] = row.sub?.split('-') ?? []
 
           return (
             <div key={`row-${row.index}`} style={{ display: 'contents' }}>
-              {/* 节次轴：普通网格项，不做 sticky。底色与空白格用同一套隔行浅色 */}
+              {/* 节次轴：三行 —— 节次号大、开始与结束时间小。
+                  参考成熟课表的轴列格式：数字最醒目，时刻分两行辅助。 */}
               <div
                 className={clsx(
-                  'tg-cell flex flex-col items-center justify-center border-b border-border text-muted',
+                  'tg-cell flex flex-col items-center justify-center gap-[2px] border-b border-border text-muted',
                   row.striped && 'tg-cell--alt',
                 )}
                 style={{ gridColumn: 1, gridRow }}
               >
-                <span className="text-[10px] leading-none sm:text-[11px]">{row.label}</span>
-                {row.sub ? (
-                  <span className="mt-0.5 text-[8px] leading-none sm:text-[9px]">{row.sub}</span>
+                <span className="text-[12px] font-medium leading-none text-ink sm:text-[13px]">
+                  {row.label}
+                </span>
+                {startTime ? (
+                  <span className="text-[9px] leading-none sm:text-[10px]">{startTime}</span>
+                ) : null}
+                {endTime ? (
+                  <span className="text-[9px] leading-none opacity-80 sm:text-[10px]">
+                    {endTime}
+                  </span>
                 ) : null}
               </div>
 
@@ -187,8 +201,12 @@ export function TimeGrid({
                 type="button"
                 onClick={block.onClick}
                 className={clsx(
-                  'h-full w-full min-w-0 overflow-hidden rounded px-0.5 py-0.5 text-left leading-tight sm:px-1',
-                  'text-[9px] sm:text-[10px]',
+                  // 注意：**不加 truncate**。课程名要换行完整显示，
+                  // 截断成"高等数…"在手机上是不可接受的（内容比整齐更重要）。
+                  'block h-full w-full min-w-0 overflow-hidden rounded-md px-1 py-0.5 text-left',
+                  // 手机上每列约 45px，11px 中文每行约 4 字；行高收到 1.15 以多容纳一行
+                  'text-[11px] leading-[1.15] sm:text-[12px]',
+                  '[overflow-wrap:anywhere]', // 超长英文名也强制断行，不撑破色块
                   block.muted
                     ? 'border border-dashed border-border bg-surface-alt text-muted line-through'
                     : 'border border-transparent text-white shadow-sm',

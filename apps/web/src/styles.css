@@ -1,6 +1,17 @@
 @import 'tailwindcss';
 
 /*
+ * 显式声明要扫描的源码范围。
+ *
+ * 为什么需要它：Tailwind 的自动内容探测对**跨包源码**不可靠 —— 实测
+ * `packages/ui`（通过 tsconfig paths 别名引入的源码包）里的字号类
+ * 没有被生成，导致 UI 包内的样式静默失效。显式写出来最稳。
+ */
+@source '../../index.html';
+@source '../src/**/*.{ts,tsx}';
+@source '../../../packages/ui/src/**/*.{ts,tsx}';
+
+/*
  * 主题令牌。Tailwind v4 的 @theme 会把 --color-* 变成可用的工具类
  * （bg-surface / text-muted / border-border …），dark 模式通过 <html data-theme="dark"> 切换。
  */

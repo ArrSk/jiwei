@@ -39,15 +39,18 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
       muted: occ.status === 'cancelled',
       style: { backgroundColor: blockColor(block) },
       content: (
-        // 手机上一列只有约 40px，因此文字做三级降级：标题 → 地点 → 老师。
-        // 小屏只保留标题与地点；老师用 `hidden sm:block` 在大屏才显示。
+        // 关键：课程名与地点都**不允许截断**（不加 truncate），
+        // 手机上要能完整显示课程全名——换行比截断重要。
+        // 文字按重要性降级：课程名（醒目）→ 地点（次要），老师仅在宽屏显示。
         <span className="flex h-full min-w-0 flex-col gap-[1px] overflow-hidden">
-          <span className="truncate font-semibold">{block.title}</span>
+          <span className="font-semibold [overflow-wrap:anywhere]">{block.title}</span>
           {block.detail?.location ? (
-            <span className="truncate opacity-90">{block.detail.location}</span>
+            <span className="opacity-90 [overflow-wrap:anywhere]">{block.detail.location}</span>
           ) : null}
           {block.detail?.teacher ? (
-            <span className="hidden truncate opacity-80 sm:block">{block.detail.teacher}</span>
+            <span className="hidden opacity-80 [overflow-wrap:anywhere] sm:block">
+              {block.detail.teacher}
+            </span>
           ) : null}
           {occ.status === 'moved' ? <span className="mt-auto opacity-90">调课</span> : null}
         </span>

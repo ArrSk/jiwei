@@ -135,3 +135,41 @@ pnpm dev
 修复方式是给表头加 `position: sticky` + `z-30`，让它形成独立的堆叠上下文。
 
 **无论以后怎么换视觉，都不要去掉 `z-30`；只想去掉吸顶效果的话，删 `sticky top-0` 即可。**
+
+---
+
+## 八、⚠️ 重大坑：`packages/ui` 里的 Tailwind 类曾长期不生效
+
+**症状**：在 `packages/ui/src/TimeGrid.tsx` 里改字号、字号类、`leading-*` 等，
+构建后产物 CSS 里**根本没有这些类**，页面上毫无变化。
+（`font-size` 只有 10px / 11px 两个值，而源码里明明写了 9/12/13px。）
+
+**根因**：Tailwind 的自动内容探测对**跨包源码**不可靠。
+`packages/ui` 是通过 tsconfig `paths` 别名引入的源码包，不在 `apps/web` 目录树内，
+它内部的类名没有被收集。
+
+**后果（重要）**：此前几轮"在 UI 包里调字号"的操作**全部静默失效**，
+包括 `design-solid` 那版号称的"节次号 14px / 时间 7px"。
+用户看到的一直是旧字号，而我误以为改动无效是"视觉选择问题"。
+
+**修复**：在 `apps/web/src/styles.css` 里显式声明扫描范围：
+
+```css
+@source '../../index.html';
+@source '../src/**/*.{ts,tsx}';
+@source '../../../packages/ui/src/**/*.{ts,tsx}';
+```
+
+修复后产物 CSS 完整包含 9/10/11/12/13px 与 `leading-[1.15]`、`overflow-wrap:anywhere`。
+
+**纪律**：以后凡是"UI 包里改了类名但页面没反应"，**先查产物 CSS 里有没有这个类**，
+再怀疑样式写法。判断命令：
+
+```powershell
+$css = (Get-ChildItem 'apps\web\dist\assets\*.css' | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');console.log('12px:', t.split('12px').length-1)" $css
+```
+
+> 同理，前几节里"分割线工具类 `border-border-soft` 没生成"也是同一类问题
+> （跨包 + 主题令牌），当时用属性选择器绕过了；根因其实是同一个。
+
