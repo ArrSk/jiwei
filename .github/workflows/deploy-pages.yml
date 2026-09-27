@@ -1,0 +1,84 @@
+# 用 GitHub 官方方式把网页版部署到 GitHub Pages
+#
+# 为什么用 Actions 而不是把构建产物提交进仓库：
+#   dist 是可再生成的文件，塞进版本库会污染历史、每次改代码都产生巨大的二进制差异。
+#   Actions 在云端构建后直接发布，仓库里只保留源码。
+#
+# 触发条件：每次推送到 main 分支，或手动在 Actions 页面点 Run workflow。
+#
+# 前提（在仓库 Settings 里设置一次）：
+#   Settings → Pages → Build and deployment → Source 选 "GitHub Actions"
+#   并且仓库必须是 **Public** —— 免费的 Pages 不支持私有仓库。
+
+name: 部署网页版到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # 允许在 Actions 页面手动触发
+  workflow_dispatch:
+
+# 部署到 Pages 需要的权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署；新的推送不打断正在进行的部署
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查
+        run: pnpm typecheck
+
+      - name: 单元测试
+        run: pnpm test
+
+      - name: 构建网页版
+        run: pnpm build
+
+      - name: 检查构建产物
+        run: node scripts/smoke.mjs
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传构建产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    name: 发布
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

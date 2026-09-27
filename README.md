@@ -3,6 +3,8 @@
 > **面向大学生的课程表应用。**手机优先、离线可用、数据只存在你自己设备上。
 > 架构从第一天起就按"多模块"设计，让日程表、提醒、闹钟、笔记等模块后续能**嵌入而不用重构**。
 
+**在线体验**：<https://arrsk.github.io/jiwei/> —— 手机上打开可以直接"添加到主屏幕"当 App 用。
+
 - 不懂技术？看 [`docs/新手使用说明.md`](docs/新手使用说明.md)（从装环境到日常使用）
 - 架构与模块设计：[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - 路线图：[`docs/ROADMAP.md`](docs/ROADMAP.md)
