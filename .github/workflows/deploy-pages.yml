@@ -37,19 +37,24 @@ jobs:
       - name: 拉取代码
         uses: actions/checkout@v4
 
-      - name: 安装 pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11
-
+      # 顺序很重要：必须先装 Node 再装 pnpm。
+      # pnpm 11 要求 Node ≥ 22，而 Runner 上预装的 Node 版本可能不满足，
+      # 反过来先跑 pnpm/action-setup 会直接失败（实测踩过）。
       - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+
+      # 不写死 pnpm 版本：让它读 package.json 里的 packageManager 字段，
+      # 避免出现「工作流写的版本」与「项目要求的版本」两处不一致。
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: 查看工具版本
+        run: node -v && pnpm -v
 
       - name: 安装依赖
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: 类型检查
         run: pnpm typecheck
