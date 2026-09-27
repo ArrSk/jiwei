@@ -19,12 +19,17 @@
 const OWNER = 'ArrSk'
 const REPO = 'jiwei'
 
-/** 一句话简介：GitHub 上仓库名旁边显示的那行 */
-const DESCRIPTION =
+/**
+ * 简介。
+ * 留空 = **不改动你已经在网页上设置好的简介**（避免覆盖你的措辞）。
+ * 想用下面的文案覆盖，就在命令后加参数：--set-description
+ */
+const DESCRIPTION = ''
+const DESCRIPTION_IF_REQUESTED =
   '面向大学生的课程表应用（网页 + 手机）。手机优先、离线可用、数据只存本机。React 19 + Vite + TypeScript 单仓多包。'
 
-/** 主页链接。留空则不设置 */
-const HOMEPAGE = ''
+/** 主页链接：GitHub 仓库右上角那个可点的地址，指向在线 Demo */
+const HOMEPAGE = `https://${OWNER.toLowerCase()}.github.io/${REPO}/`
 
 /** 标签：GitHub 上用来分类与搜索的关键词，最多 20 个，只能用字母数字与连字符 */
 const TOPICS = [
@@ -49,6 +54,8 @@ const TOPICS = [
 ]
 
 const dryRun = process.argv.includes('--dry-run')
+/** 是否覆盖简介：默认不动，避免把你已经设好的文案冲掉 */
+const wantDescription = process.argv.includes('--set-description')
 const token = process.env.GITHUB_TOKEN
 
 async function api(path, init = {}) {
@@ -74,7 +81,9 @@ async function api(path, init = {}) {
 
 console.log(`\nGitHub 仓库设置：${OWNER}/${REPO}\n`)
 console.log('  将设置为：')
-console.log(`    简介   ${DESCRIPTION}`)
+console.log(
+  `    简介   ${wantDescription ? DESCRIPTION_IF_REQUESTED : '（保持不变，不动你已设置的）'}`,
+)
 if (HOMEPAGE) console.log(`    主页   ${HOMEPAGE}`)
 console.log(`    标签   ${TOPICS.join(', ')}`)
 console.log(`    共 ${TOPICS.length} 个标签\n`)
@@ -89,31 +98,34 @@ if (!token) {
 
   请在 PowerShell 里执行（把 ghp_xxx 换成你的令牌）：
 
-    $env:GITHUB_TOKEN = "ghp_xxx"
-    node scripts/github-meta.mjs
+    cd E:\\CodeAndProj\\jiwei
+    $env:GITHUB_TOKEN = "ghp_xxx"; node scripts/github-meta.mjs
 
   令牌获取地址：https://github.com/settings/tokens
-  需要勾选 \`repo\` 权限。脚本不会保存令牌，关掉窗口就没了。
+  选 "Generate new token (classic)"，勾选 \`repo\`，有效期选 7 天即可。
+  脚本不会保存令牌 —— 关掉那个窗口就没了。
 `)
   process.exit(2)
 }
 
-// 1) 简介与主页
+// 1) 简介（可选）与主页
+const patchBody = {
+  ...(wantDescription ? { description: DESCRIPTION_IF_REQUESTED } : {}),
+  ...(HOMEPAGE ? { homepage: HOMEPAGE } : {}),
+}
 const patch = await api(`/repos/${OWNER}/${REPO}`, {
   method: 'PATCH',
-  body: JSON.stringify({
-    description: DESCRIPTION,
-    ...(HOMEPAGE ? { homepage: HOMEPAGE } : {}),
-  }),
+  body: JSON.stringify(patchBody),
 })
 if (patch.ok) {
-  console.log('  ✔ 简介与主页已更新')
+  const what = [wantDescription ? '简介' : null, HOMEPAGE ? '主页' : null].filter(Boolean)
+  console.log(`  ✔ 已更新：${what.join('、')}`)
 } else {
-  console.error(`  ✘ 简介更新失败（HTTP ${patch.status}）`)
+  console.error(`  ✘ 仓库信息更新失败（HTTP ${patch.status}）`)
   console.error(`    ${typeof patch.body === 'string' ? patch.body : patch.body?.message ?? ''}`)
   if (patch.status === 401) console.error('    → 令牌无效或已过期')
   if (patch.status === 403) console.error('    → 令牌权限不足，需要 repo 权限')
-  if (patch.status === 404) console.error('    → 找不到仓库，或令牌没有权限访问私有仓库')
+  if (patch.status === 404) console.error('    → 找不到仓库，或令牌没有访问权限')
 }
 
 // 2) 标签（这个接口要求整体替换）
