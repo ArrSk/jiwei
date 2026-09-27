@@ -12,6 +12,7 @@
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { networkInterfaces } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -74,6 +75,31 @@ const server = createServer(async (req, res) => {
   }
 })
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`静态产物服务已启动: http://127.0.0.1:${PORT}/  (${DIST})`)
+/**
+ * 绑定到 0.0.0.0（而不仅是 127.0.0.1），否则**手机连不进来**——
+ * 只能本机访问。这里顺带把局域网地址打印出来，省得每次去找 IP。
+ */
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`静态产物服务已启动（端口 ${PORT}）`)
+  console.log(`  本机:   http://127.0.0.1:${PORT}/`)
+  for (const lan of lanAddresses()) {
+    console.log(`  手机:   http://${lan}:${PORT}/`)
+  }
+  console.log(`  目录:   ${DIST}`)
 })
+
+/** 列出本机局域网 IPv4 地址（只为打印提示，失败不影响服务） */
+function lanAddresses() {
+  try {
+    const nets = networkInterfaces()
+    const out = []
+    for (const list of Object.values(nets)) {
+      for (const net of list ?? []) {
+        if (net.family === 'IPv4' && !net.internal) out.push(net.address)
+      }
+    }
+    return out
+  } catch {
+    return []
+  }
+}
