@@ -14,8 +14,14 @@ if (files.length === 0) {
   process.exit(2)
 }
 
-/** UTF-8 被按 GBK 解读后常见的残留字符 */
-const MOJIBAKE_CHARS = /[\u9518\u9526\u9428\u9540\u9522\u9547\u93b5\u93c4\u951b]/g
+/**
+ * UTF-8 被按 GBK 解读后产生的**特征字符**。
+ *
+ * 这里刻意只放正常中文里极罕见的码位 —— 早先的集合里混进了「锦」「镇」这类
+ * 常用字，导致文档里的正常中文（如"锦上添花"）被误报为乱码。
+ * 宁可少报，也不要把好文件标成坏的。
+ */
+const MOJIBAKE_CHARS = /[\u9518\u9428\u9540\u9522\u93b5\u93c4\u951b\u9429\u93a9\u93f4]/g
 
 let bad = 0
 for (const file of files) {
@@ -34,11 +40,18 @@ for (const file of files) {
 
   const replacement = [...text].filter((c) => c === '\uFFFD').length
   const mojibake = (text.match(MOJIBAKE_CHARS) ?? []).length
+  // 注释与标签被并到同一行（代码被写坏的典型特征）。
+  // 两条注意：
+  //   1. 排除 URL 里的 `https://`，否则文档里的链接会误报
+  //   2. 只认真正的 JSX/HTML 标签名 —— 不能用 `<[A-Za-z]`，
+  //      否则注释里的文件占位符（如 data/notes/<id>.md）会被误判
+  const JSX_TAG = /<(span|div|p|a|button|input|select|label|table|tr|td|ul|li|svg|img|form|h[1-6])\b/i
   const mergedLines = text
     .split(/\r?\n/)
     .filter((line) => {
-      const idx = line.indexOf('//')
-      return idx >= 0 && /<[A-Za-z]/.test(line.slice(idx))
+      const withoutUrls = line.replace(/https?:\/\/\S+/g, '')
+      const idx = withoutUrls.indexOf('//')
+      return idx >= 0 && JSX_TAG.test(withoutUrls.slice(idx))
     }).length
 
   const problems = []

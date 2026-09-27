@@ -46,7 +46,7 @@ for (const name of wanted) {
   const needle = `.${escapeLikeTailwind(name)}`
   const found = css.includes(needle)
   if (!found) missing += 1
-  console.log(`  ${found ? '✔' : '�’'} ${name}${found ? '' : '   ← 产物里没有！'}`)
+  console.log(`  ${found ? '✔' : '✘'} ${name}${found ? '' : '   ← 产物里没有！'}`)
 }
 
 console.log(

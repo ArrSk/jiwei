@@ -94,16 +94,48 @@ jiwei/
 │  └─ native/             # Capacitor 外壳（壳工程，代码复用 apps/web）
 ├─ packages/
 │  ├─ core/               # ★ Zod 模型 + 时间/周次/冲突纯函数（唯一时间真相）
-│  ├─ data/               # ★ 仓储接口 + Dexie 引擎（可替换）+ 迁移
+│  ├─ data/               # ★ 仓储接口 + Dexie 引擎（可替换）+ 备份恢复
 │  ├─ ui/                 # 通用 UI 组件 + 时间网格基座
 │  └─ platform/           # ★ 能力适配层（通知/闹钟/存储/文件，Capacitor 就绪）
-├─ docs/                  # 架构、闹钟研究、路线图、决策记录、名称释义
+├─ scripts/               # 开发与检查脚本（见下表）
+├─ docs/                  # 架构、新手说明、调研、路线图、决策记录
 ├─ pnpm-workspace.yaml
 └─ README.md
 ```
 
 带 ★ 的三个包是"加功能不用重构"的关键：`core` 定模型、`data` 定存储、`platform` 定能力边界。
 每个未来功能 = `apps/web/src/features/<name>/` + 一个模块注册项，**feature 之间禁止互相 import**。
+
+---
+
+## 文档索引
+
+| 文档 | 给谁看 | 内容 |
+| --- | --- | --- |
+| [`docs/新手使用说明.md`](docs/新手使用说明.md) | **不懂技术的人** | 从装环境到日常使用的完整步骤，含排错 |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 开发者 | 架构、数据模型、目录结构、风险 |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 开发者 | 8 条 ADR，每条都写清"为什么" |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | 所有人 | 接下来做什么，分 M0~M8 阶段 |
+| [`docs/DESIGN-VERSIONS.md`](docs/DESIGN-VERSIONS.md) | 开发者 | 界面改过几版、如何回退、踩过的坑 |
+| [`docs/NAMING.md`](docs/NAMING.md) | 所有人 | 项目名「几微」的出处与含义 |
+| [`docs/ALARM-STUDY.md`](docs/ALARM-STUDY.md) | 决策参考 | 为什么浏览器做不了闹钟 |
+| [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | 本机环境 | 网络/沙箱/编码等环境问题的诊断 |
+| [`docs/MOBILE-ARCHITECTURE.md`](docs/MOBILE-ARCHITECTURE.md) | 开发者 | 手机端架构评估与调试方案 |
+| [`docs/正式版存储与调试调研.md`](docs/正式版存储与调试调研.md) | 决策参考 | 打包成手机 App 后存储可靠性与调试（含出处） |
+
+## 脚本索引
+
+| 脚本 | 用途 |
+| --- | --- |
+| `pnpm dev` | 启动开发服务器（改代码自动刷新） |
+| `pnpm build` | 打包正式版本到 `apps/web/dist` |
+| `node scripts/serve-dist.mjs 4173` | 把打包结果开成服务（**绑定 0.0.0.0，手机可访问**） |
+| `pnpm typecheck` | 类型检查（5 个包） |
+| `pnpm test` | 单元测试（core 52 + data 20） |
+| `node scripts/smoke.mjs` | **构建产物冒烟检查**：资源是否齐全、关键样式类是否生成、PWA 文件与 manifest |
+| `node scripts/check-classes.mjs "<类名>"` | 检查某个 Tailwind 类有没有真的进产物（本项目踩过跨包扫描的坑） |
+| `node scripts/check-encoding.mjs <文件...>` | 检查文件有没有被写成乱码/BOM/注释与标签并成一行 |
+| `node scripts/install-retry.mjs 12` | 网络不稳时反复 install 直到成功 |
 
 ---
 
