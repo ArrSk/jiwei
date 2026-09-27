@@ -104,4 +104,33 @@ export interface Repos {
    * @returns 重建后的场次数量
    */
   rebuildOccurrences(semesterId: string): Promise<number>
+
+  /**
+   * 导出全部**原始记录**（备份用）。
+   *
+   * 为什么不导出 Occurrence：它是由 Block + Adjustment 派生出来的，
+   * 恢复时用 `rebuildOccurrences()` 重新生成即可 —— 这样备份文件更小，
+   * 也不会出现"备份里的场次与课程对不上"的隐患。
+   */
+  dumpAll(): Promise<StoreDump>
+
+  /**
+   * 用备份数据**整体替换**当前数据（恢复用）。
+   *
+   * 必须在单个事务里完成：先清空再写入，失败整体回滚 ——
+   * 恢复是"要么全成、要么全不动"的操作，写坏一半比不做更糟。
+   */
+  restoreAll(dump: StoreDump): Promise<void>
+}
+
+/** 全量备份的数据形态（不含派生表 Occurrence） */
+export interface StoreDump {
+  semesters: Semester[]
+  periods: Period[]
+  blocks: Block[]
+  adjustments: Adjustment[]
+  alerts: Alert[]
+  notes: Note[]
+  /** meta 中的键值（含作息配方 scheduleConfig） */
+  meta: Record<string, string>
 }

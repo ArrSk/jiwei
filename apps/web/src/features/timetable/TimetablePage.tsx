@@ -20,6 +20,7 @@ import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, type TimeGridColumn, type 
 import { useJiwei } from '../../JiweiContext'
 import { useUiStore } from '../../store'
 import { buildDemoCourses } from '../../lib/demoCourses'
+import { allWeeks } from '@jiwei/data'
 import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
@@ -177,7 +178,11 @@ export function TimetablePage() {
 
   async function handleSubmit(value: CourseFormValue): Promise<void> {
     if (!semester) return
-    const weeks = parseWeeks(value.weeksText, semester.totalWeeks)
+    // 周次留空 = 每周（表单里的「全周」快选也是这个语义）
+    const weeks =
+      value.weeksText.trim() === ''
+        ? allWeeks(semester.totalWeeks)
+        : parseWeeks(value.weeksText, semester.totalWeeks)
     if (weeks.length === 0) {
       toast('周次解析为空，请检查输入（例如 1-16 或 1-16单）', 'error')
       return
@@ -199,8 +204,8 @@ export function TimetablePage() {
         ...(value.teacher.trim() ? { teacher: value.teacher.trim() } : {}),
         ...(value.location.trim() ? { location: value.location.trim() } : {}),
       },
-      // 不存颜色：配色由 `lib/palette.ts` 的 paletteForTitle(课程名) 稳定派生，
-      // 避免"存了颜色但渲染不用"的两套真相。
+      // 颜色：用户在表单里选了就存下来；留空则由 paletteForTitle(课程名) 派生
+      ...(value.color ? { color: value.color } : {}),
       createdAt: at,
       updatedAt: at,
     }

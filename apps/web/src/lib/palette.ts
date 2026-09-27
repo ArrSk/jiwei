@@ -60,3 +60,17 @@ export function paletteForTitle(title: string): BlockPalette {
   }
   return BLOCK_PALETTES[hashTitle(title) % BLOCK_PALETTES.length] ?? BLOCK_PALETTES[0]!
 }
+
+/**
+ * 按"课程自选颜色"取完整色板。
+ *
+ * 表单里用户选的是某个色板的 `bg`（浅底），这里把配套的左边线与文字色一并取回；
+ * 若色值不在内置色板里（例如来自旧数据），就以该色为底、沿用标题派生的文字色，
+ * 保证"深字浅底"的对比度不被破坏。
+ */
+export function paletteForBlock(block: { title: string; color?: string }): BlockPalette {
+  const fallback = paletteForTitle(block.title)
+  if (!block.color) return fallback
+  const known = BLOCK_PALETTES.find((p) => p.bg === block.color)
+  return known ?? { ...fallback, bg: block.color }
+}

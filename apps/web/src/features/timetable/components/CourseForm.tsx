@@ -1,11 +1,19 @@
 /**
- * 添加课程表单（移动端底部弹层）。
+ * 添加课程表单。
  *
- * M0 只做"能录入"的最小集合：名称、老师、地点、星期、起止节次、周次。
- * 编辑已有课程、批量表格编辑排在 M1（docs/ROADMAP.md）。
+ * 布局参照 `plugin-campus/index.html` 的底部弹层（`.mask` + `.sheet` + `.form-row`）：
+ * 遮罩点击关闭、圆角上边距、label 固定宽度左对齐、输入框浅灰底聚焦变白、
+ * 底部三按钮等分。
+ *
+ * 手机端适配要点：
+ * - 弹层 `max-height: 88dvh`（dvh 而非 vh，避免 iOS 地址栏伸缩时跳动）
+ * - 底部内边距叠加 `env(safe-area-inset-bottom)`，避开 Home Indicator
+ * - 输入框 `min-height: 44px`，达到触摸目标下限
+ * - 主表单不自动聚焦：手机上会立刻弹键盘把布局顶乱
  */
 import { useState } from 'react'
 import { WEEKDAY_LABELS } from '@jiwei/core'
+import { BLOCK_PALETTES } from '../../../lib/palette'
 
 export interface CourseFormValue {
   title: string
@@ -14,8 +22,10 @@ export interface CourseFormValue {
   weekday: number
   periodStart: number
   periodEnd: number
-  /** 周次文本，如 `1-16` / `1-16单` / `1,3,5,7` */
+  /** 周次文本，如 `1-16` / `1-16单` / `1,3,5,7`；留空表示每周 */
   weeksText: string
+  /** 课程颜色（取自 BLOCK_PALETTES 的 bg；留空则按课程名自动配色） */
+  color: string
 }
 
 export function emptyCourseForm(weekday = 1, periodStart = 1): CourseFormValue {
@@ -26,7 +36,8 @@ export function emptyCourseForm(weekday = 1, periodStart = 1): CourseFormValue {
     weekday,
     periodStart,
     periodEnd: Math.min(periodStart + 1, 12),
-    weeksText: '1-16',
+    weeksText: '',
+    color: '',
   }
 }
 
@@ -37,14 +48,43 @@ interface Props {
   onClose: () => void
   maxPeriod: number
   totalWeeks: number
+  /** 编辑模式：显示删除按钮 */
+  onDelete?: () => Promise<void>
+  isEditing?: boolean
 }
 
-export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, totalWeeks }: Props) {
+/** 周次快捷选择：把「1-16」这类文本归纳成 全周 / 单周 / 双周 */
+export function detectWeekMode(text: string): 'all' | 'odd' | 'even' | 'custom' {
+  const t = text.trim()
+  if (!t) return 'all'
+  if (/单周|单$/.test(t)) return 'odd'
+  if (/双周|双$/.test(t)) return 'even'
+  return 'custom'
+}
+
+export function CourseForm({
+  value,
+  onChange,
+  onSubmit,
+  onClose,
+  maxPeriod,
+  totalWeeks,
+  onDelete,
+  isEditing = false,
+}: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const weekMode = detectWeekMode(value.weeksText)
+
   function patch(part: Partial<CourseFormValue>): void {
     onChange({ ...value, ...part })
+  }
+
+  function applyWeekMode(mode: 'all' | 'odd' | 'even'): void {
+    if (mode === 'all') patch({ weeksText: '' })
+    else if (mode === 'odd') patch({ weeksText: `1-${totalWeeks}单` })
+    else patch({ weeksText: `1-${totalWeeks}双` })
   }
 
   async function handleSubmit(): Promise<void> {
@@ -66,128 +106,191 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 sm:items-center">
-      {/*
-        手机端：**全屏布局**（而不是底部半屏弹层）—— 表单字段多，
-        半屏在小屏上要来回滚动，全屏一次能看全，且底部按钮固定不随滚动跑掉。
-        桌面端：仍然是居中弹窗。
-      */}
-      <div className="flex h-full w-full flex-col bg-surface shadow-xl sm:h-auto sm:max-h-[92dvh] sm:max-w-md sm:rounded-2xl">
-        {/* 头部固定 */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <h2 className="text-base font-semibold sm:text-sm">添加课程</h2>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
+      <div
+        className="w-full max-w-[640px] overflow-y-auto rounded-t-[18px] bg-surface px-[18px] pt-[18px] shadow-xl"
+        style={{
+          maxHeight: '88dvh',
+          paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
+        }}
+      >
+        <h3 className="mb-3.5 text-center text-base font-semibold">
+          {isEditing ? '编辑课程' : '添加课程'}
+        </h3>
+
+        <Row label="课程名">
+          <input
+            autoFocus={!isTouchDevice()}
+            className={inputClass}
+            placeholder="如：高等数学A（I）上"
+            value={value.title}
+            onChange={(e) => patch({ title: e.target.value })}
+          />
+        </Row>
+
+        <Row label="教师">
+          <input
+            className={inputClass}
+            placeholder="选填"
+            value={value.teacher}
+            onChange={(e) => patch({ teacher: e.target.value })}
+          />
+        </Row>
+
+        <Row label="教室">
+          <input
+            className={inputClass}
+            placeholder="选填，如：教西—101"
+            value={value.location}
+            onChange={(e) => patch({ location: e.target.value })}
+          />
+        </Row>
+
+        <Row label="星期">
+          <select
+            className={inputClass}
+            value={value.weekday}
+            onChange={(e) => patch({ weekday: Number(e.target.value) })}
+          >
+            {WEEKDAY_LABELS.map((label, i) => (
+              <option key={label} value={i + 1}>
+                周{label}
+              </option>
+            ))}
+          </select>
+        </Row>
+
+        <Row label="节次">
+          <div className="flex flex-1 items-center gap-2">
+            <select
+              className={inputClass + ' flex-1'}
+              value={value.periodStart}
+              onChange={(e) => {
+                const start = Number(e.target.value)
+                // 起始超过结束时就一起把结束推后，避免出现非法区间
+                patch({ periodStart: start, periodEnd: Math.max(start, value.periodEnd) })
+              }}
+            >
+              {range(1, maxPeriod).map((n) => (
+                <option key={n} value={n}>
+                  第 {n} 节
+                </option>
+              ))}
+            </select>
+            <span className="shrink-0 text-[13px] text-muted">至</span>
+            <select
+              className={inputClass + ' flex-1'}
+              value={value.periodEnd}
+              onChange={(e) => patch({ periodEnd: Number(e.target.value) })}
+            >
+              {range(value.periodStart, maxPeriod).map((n) => (
+                <option key={n} value={n}>
+                  第 {n} 节
+                </option>
+              ))}
+            </select>
+          </div>
+        </Row>
+
+        <Row label="颜色">
+          <div className="flex flex-1 flex-wrap items-center gap-2.5">
+            {/* 「自动」= 不指定，按课程名稳定派生 */}
+            <button
+              type="button"
+              title="自动配色"
+              aria-label="自动配色"
+              onClick={() => patch({ color: '' })}
+              className={
+                'grid h-7 w-7 place-items-center rounded-full border text-[10px] transition-transform ' +
+                (value.color === ''
+                  ? 'border-ink ring-2 ring-ink/20'
+                  : 'border-border text-muted')
+              }
+            >
+              自
+            </button>
+            {BLOCK_PALETTES.map((p) => {
+              const selected = value.color === p.bg
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  title={p.label}
+                  aria-label={`颜色 ${p.label}`}
+                  onClick={() => patch({ color: p.bg })}
+                  className={
+                    'h-7 w-7 rounded-full border-2 transition-transform active:scale-95 ' +
+                    (selected ? 'border-ink' : 'border-transparent')
+                  }
+                  style={{ backgroundColor: p.border }}
+                />
+              )
+            })}
+          </div>
+        </Row>
+
+        <Row label="周次">
+          <div className="flex flex-1 gap-2">
+            {(
+              [
+                ['all', '全周'],
+                ['odd', '单周'],
+                ['even', '双周'],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                className={
+                  'min-h-[38px] flex-1 rounded-lg border py-1.5 text-[13px] transition-colors ' +
+                  (weekMode === mode
+                    ? 'border-brand bg-brand text-white'
+                    : 'border-border bg-surface-alt text-ink')
+                }
+                onClick={() => applyWeekMode(mode)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Row>
+
+        <Row label="">
+          <input
+            className={inputClass}
+            placeholder={`如 1-16 或 1,3,5（留空 = 每周，共 ${totalWeeks} 周）`}
+            value={value.weeksText}
+            onChange={(e) => patch({ weeksText: e.target.value })}
+          />
+        </Row>
+
+        {error ? <p className="mb-2 text-center text-xs text-danger">{error}</p> : null}
+
+        <div className="mt-4 flex gap-2.5">
+          {isEditing && onDelete ? (
+            <button
+              type="button"
+              disabled={busy}
+              className="min-h-[46px] shrink-0 basis-[30%] rounded-xl bg-danger/10 text-[15px] text-danger disabled:opacity-60"
+              onClick={() => {
+                setBusy(true)
+                void onDelete().finally(() => setBusy(false))
+              }}
+            >
+              删除
+            </button>
+          ) : null}
           <button
             type="button"
-            className="rounded-md px-3 py-1.5 text-sm text-muted hover:bg-surface-alt sm:text-xs"
+            className="min-h-[46px] flex-1 rounded-xl bg-surface-alt text-[15px] text-ink"
             onClick={onClose}
           >
             取消
           </button>
-        </div>
-
-        {/* 主体可滚动；手机上输入框加大到 44px 触摸高度 */}
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 text-base [&_input]:min-h-[44px] [&_select]:min-h-[44px] sm:space-y-3 sm:text-sm sm:[&_input]:min-h-0 sm:[&_select]:min-h-0">
-          <Field label="课程名称">
-            {/* 手机上不自动聚焦：会立刻弹起键盘，把刚打开的布局顶乱 */}
-            <input
-              autoFocus={!isTouchDevice()}
-              className="w-full"
-              placeholder="例如：高等数学"
-              value={value.title}
-              onChange={(e) => patch({ title: e.target.value })}
-            />
-          </Field>
-
-          {/* 手机上一行一个，宽屏才并排 */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
-            <Field label="老师（可选）">
-              <input
-                className="w-full"
-                placeholder="张老师"
-                value={value.teacher}
-                onChange={(e) => patch({ teacher: e.target.value })}
-              />
-            </Field>
-            <Field label="地点（可选）">
-              <input
-                className="w-full"
-                placeholder="教三 201"
-                value={value.location}
-                onChange={(e) => patch({ location: e.target.value })}
-              />
-            </Field>
-          </div>
-
-          <Field label="星期">
-            <div className="grid grid-cols-7 gap-1">
-              {WEEKDAY_LABELS.map((label, i) => {
-                const weekday = i + 1
-                const active = value.weekday === weekday
-                return (
-                  <button
-                    key={weekday}
-                    type="button"
-                    className={
-                      'h-11 rounded-md border text-sm transition-colors sm:h-9 sm:text-xs ' +
-                      (active
-                        ? 'border-brand bg-brand text-white'
-                        : 'border-border bg-surface hover:bg-surface-alt')
-                    }
-                    onClick={() => patch({ weekday })}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-4 sm:gap-3">
-            <Field label="开始节次">
-              <select
-                className="w-full"
-                value={value.periodStart}
-                onChange={(e) => patch({ periodStart: Number(e.target.value) })}
-              >
-                {range(1, maxPeriod).map((n) => (
-                  <option key={n} value={n}>
-                    第 {n} 节
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="结束节次（含）">
-              <select
-                className="w-full"
-                value={value.periodEnd}
-                onChange={(e) => patch({ periodEnd: Number(e.target.value) })}
-              >
-                {range(value.periodStart, maxPeriod).map((n) => (
-                  <option key={n} value={n}>
-                    第 {n} 节
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          <Field label={`周次（共 ${totalWeeks} 周）`} hint="支持 1-16、1,3,5、1-16单、1-16双">
-            <input
-              className="w-full"
-              placeholder="1-16"
-              value={value.weeksText}
-              onChange={(e) => patch({ weeksText: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        {/* 底部操作区固定；手机端留出 Home Indicator 安全区 */}
-        <div className="shrink-0 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {error ? <p className="mb-2 text-xs text-danger">{error}</p> : null}
           <button
             type="button"
             disabled={busy}
-            className="w-full rounded-lg bg-brand py-3 text-sm font-medium text-white disabled:opacity-60 sm:py-2.5"
+            className="min-h-[46px] flex-1 rounded-xl bg-brand text-[15px] font-medium text-white disabled:opacity-60"
             onClick={() => void handleSubmit()}
           >
             {busy ? '保存中…' : '保存'}
@@ -198,30 +301,24 @@ export function CourseForm({ value, onChange, onSubmit, onClose, maxPeriod, tota
   )
 }
 
+/** 输入框统一样式：浅底、聚焦高亮、手机 44px 触摸高度 */
+const inputClass =
+  'min-w-0 flex-1 rounded-lg border border-border bg-surface-alt px-2.5 py-2 text-sm ' +
+  'outline-none transition-colors min-h-[44px] focus:border-brand focus:bg-surface sm:min-h-0'
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-3 flex items-center gap-2.5">
+      <span className="w-[58px] shrink-0 text-sm text-muted">{label}</span>
+      {children}
+    </div>
+  )
+}
+
 /** 触屏设备：用媒体查询判断，比 UA 嗅探可靠 */
 function isTouchDevice(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false
   return window.matchMedia('(hover: none)').matches
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string
-  hint?: string
-  children: React.ReactNode
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-muted">
-        {label}
-        {hint ? <span className="ml-1 opacity-70">（{hint}）</span> : null}
-      </span>
-      {children}
-    </label>
-  )
 }
 
 function range(from: number, to: number): number[] {

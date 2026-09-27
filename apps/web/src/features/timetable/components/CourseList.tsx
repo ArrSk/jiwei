@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { WEEKDAY_LABELS, type Block } from '@jiwei/core'
 import { TrashIcon } from '@jiwei/ui'
-import { paletteForTitle } from '../../../lib/palette'
+import { paletteForBlock } from '../../../lib/palette'
 
 interface Props {
   courses: Block[]
@@ -51,7 +51,7 @@ export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
             <li key={course.id} className="flex items-center gap-3 px-3 py-2">
               <span
                 className="h-8 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: paletteForTitle(course.title).border }}
+                style={{ backgroundColor: paletteForBlock(course).border }}
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{course.title}</div>

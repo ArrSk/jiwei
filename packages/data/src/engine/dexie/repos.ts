@@ -5,7 +5,7 @@
  * IndexedDB 没有 SQL 的事务语义，一旦中途失败留下半套数据，
  * 课表会显示成"有的一周有课、有的一周没课"，且很难排查。
  */
-import { materializeAll, type Adjustment, type Block, type Period, type Semester } from '@jiwei/core'
+import { materializeAll, type Adjustment, type Alert, type Block, type Note, type Period, type Semester } from '@jiwei/core'
 import type {
   AlertRepo,
   BlockRepo,
@@ -15,6 +15,7 @@ import type {
   PeriodRepo,
   Repos,
   SemesterRepo,
+  StoreDump,
 } from '../../types'
 import { JiweiDatabase, type OccurrenceRow } from './db'
 
@@ -199,6 +200,74 @@ export function createDexieRepos(db: JiweiDatabase): Repos {
       })
 
       return rows.length
+    },
+
+    /** 导出全部原始记录（不含派生表 Occurrence） */
+    async dumpAll(): Promise<StoreDump> {
+      const [semesters, periods, blocks, adjustments, alerts, notes, metaRows] = await Promise.all([
+        db.semesters.toArray(),
+        db.periods.toArray(),
+        db.blocks.toArray(),
+        db.adjustments.toArray(),
+        db.alerts.toArray(),
+        db.notes.toArray(),
+        db.meta.toArray(),
+      ])
+      return {
+        semesters: semesters as Semester[],
+        periods: periods as Period[],
+        blocks: blocks as Block[],
+        adjustments: adjustments as Adjustment[],
+        alerts: alerts as Alert[],
+        notes: notes as Note[],
+        meta: Object.fromEntries(metaRows.map((r) => [r.key, r.value])),
+      }
+    },
+
+    /**
+     * 用备份整体替换当前数据。
+     *
+     * 单个事务内"先清空再写入"：恢复要么全成、要么全不动。
+     * 写完再逐学期重建 Occurrence —— 只重建一次，避免不必要的事务。
+     */
+    async restoreAll(dump: StoreDump): Promise<void> {
+      await db.transaction(
+        'rw',
+        [
+          db.semesters,
+          db.periods,
+          db.blocks,
+          db.occurrences,
+          db.adjustments,
+          db.alerts,
+          db.notes,
+          db.meta,
+        ],
+        async () => {
+          await Promise.all([
+            db.semesters.clear(),
+            db.periods.clear(),
+            db.blocks.clear(),
+            db.occurrences.clear(),
+            db.adjustments.clear(),
+            db.alerts.clear(),
+            db.notes.clear(),
+            db.meta.clear(),
+          ])
+          await db.semesters.bulkPut(dump.semesters)
+          await db.periods.bulkPut(dump.periods)
+          await db.blocks.bulkPut(dump.blocks)
+          await db.adjustments.bulkPut(dump.adjustments)
+          await db.alerts.bulkPut(dump.alerts)
+          await db.notes.bulkPut(dump.notes)
+          await db.meta.bulkPut(Object.entries(dump.meta).map(([key, value]) => ({ key, value })))
+        },
+      )
+
+      // Occurrence 是派生数据：恢复后按新数据重建
+      for (const sem of dump.semesters) {
+        await this.rebuildOccurrences(sem.id)
+      }
     },
   }
 }

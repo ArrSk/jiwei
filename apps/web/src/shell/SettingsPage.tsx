@@ -10,6 +10,7 @@ import { describeCapabilities } from '@jiwei/platform'
 import type { Semester } from '@jiwei/core'
 import { useJiwei } from '../JiweiContext'
 import { ScheduleSettings } from './ScheduleSettings'
+import { BackupSettings } from './BackupSettings'
 
 interface Props {
   onClose: () => void
@@ -33,7 +34,11 @@ export function SettingsPage({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-xl sm:max-w-md sm:rounded-2xl">
+      <div
+        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-surface px-4 pt-4 shadow-xl sm:max-w-md sm:rounded-2xl"
+        // 底部叠加安全区，避开 iPhone 的 Home Indicator（之前漏了这一处）
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold">设置</h2>
           <button
@@ -46,6 +51,8 @@ export function SettingsPage({ onClose }: Props) {
         </div>
 
         {semester ? <ScheduleSettings semester={semester} /> : null}
+
+        <BackupSettings />
 
         <section className="mb-4">
           <h3 className="mb-2 text-xs font-medium text-muted">当前平台能力</h3>

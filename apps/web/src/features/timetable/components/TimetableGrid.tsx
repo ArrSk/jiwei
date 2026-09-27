@@ -1,7 +1,7 @@
 /** 课表网格：把核心数据映射到通用的 `TimeGrid`（后者不认识"课"这个概念）。 */
 import type { Block, Occurrence } from '@jiwei/core'
 import { TimeGrid, type TimeGridBlock, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
-import { paletteForTitle } from '../../../lib/palette'
+import { paletteForBlock } from '../../../lib/palette'
 
 export interface PositionedBlock {
   block: Block
@@ -21,8 +21,8 @@ interface Props {
 export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
   const gridBlocks: TimeGridBlock[] = blocks.map(
     ({ block, occ, weekday, periodStart, periodEnd }) => {
-      // 一门课一种颜色，按标题稳定派生（含常见课程的固定配色）
-      const palette = paletteForTitle(block.title)
+      // 一门课一种颜色：用户自选优先，否则按课程名稳定派生
+      const palette = paletteForBlock(block)
 
       return {
         id: occ.id,
