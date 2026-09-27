@@ -46,6 +46,19 @@ for (const ref of refs) {
   ok(`资源存在: ${ref}`, existsSync(path.join(DIST, ref)))
 }
 
+// 2b. 资源必须用**相对路径**引用。
+// 部署到 GitHub Pages 时页面在 `用户名.github.io/jiwei/`，
+// 绝对路径 `/assets/...` 会指向域名根目录 → JS/CSS 全部 404 → 页面白屏。
+const allRefs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+  .map((m) => m[1])
+  .filter((r) => !/^(https?:)?\/\//.test(r) && !r.startsWith('data:'))
+const absoluteRefs = allRefs.filter((r) => r.startsWith('/'))
+ok(
+  '资源引用使用相对路径（部署到子目录不会白屏）',
+  absoluteRefs.length === 0,
+  absoluteRefs.length === 0 ? `${allRefs.length} 个引用均为相对路径` : `绝对路径: ${absoluteRefs.join(', ')}`,
+)
+
 // 3. 关键样式类（改 UI 后最容易"以为生效其实没生成"）
 const cssFiles = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.css'))
 const css = cssFiles

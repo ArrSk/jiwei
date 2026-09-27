@@ -1,18 +1,13 @@
 # 几微 · jiwei
 
-> **大学生日常生活 App。**首版只做课程表，架构从第一天起就按"多模块"设计，
-> 让日程表、重要事件提醒、闹钟、笔记、待办等模块后续能**嵌入而不用重构**。
+> **面向大学生的课程表应用。**手机优先、离线可用、数据只存在你自己设备上。
+> 架构从第一天起就按"多模块"设计，让日程表、提醒、闹钟、笔记等模块后续能**嵌入而不用重构**。
 
-**「几微」**（jī wēi）取自《易·系辞下》——「**几者，动之微，吉之先见者也**」「**知几其神乎**」。
-「几」是事情将要发动而未发动的那个临界点。这个 App 的价值不在记录了多少事，
-而在**在对的那一瞬让人知道该做什么**：上课前十分钟、截止前一夜、事情还没耽误的最后一刻。
-→ 完整释义与备选名称留档见 [`docs/NAMING.md`](docs/NAMING.md)
-
+- 不懂技术？看 [`docs/新手使用说明.md`](docs/新手使用说明.md)（从装环境到日常使用）
 - 架构与模块设计：[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- 闹钟可行性研究（Web 做不到，怎么做）：[`docs/ALARM-STUDY.md`](docs/ALARM-STUDY.md)
 - 路线图：[`docs/ROADMAP.md`](docs/ROADMAP.md)
 - 决策记录（ADR）：[`docs/DECISIONS.md`](docs/DECISIONS.md)
-- 名称释义：[`docs/NAMING.md`](docs/NAMING.md)
+- 闹钟可行性研究（为什么浏览器做不到）：[`docs/ALARM-STUDY.md`](docs/ALARM-STUDY.md)
 
 ---
 
@@ -114,10 +109,9 @@ jiwei/
 | --- | --- | --- |
 | [`docs/新手使用说明.md`](docs/新手使用说明.md) | **不懂技术的人** | 从装环境到日常使用的完整步骤，含排错 |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 开发者 | 架构、数据模型、目录结构、风险 |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 开发者 | 8 条 ADR，每条都写清"为什么" |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 开发者 | 7 条 ADR，每条都写清"为什么" |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | 所有人 | 接下来做什么，分 M0~M8 阶段 |
 | [`docs/DESIGN-VERSIONS.md`](docs/DESIGN-VERSIONS.md) | 开发者 | 界面改过几版、如何回退、踩过的坑 |
-| [`docs/NAMING.md`](docs/NAMING.md) | 所有人 | 项目名「几微」的出处与含义 |
 | [`docs/ALARM-STUDY.md`](docs/ALARM-STUDY.md) | 决策参考 | 为什么浏览器做不了闹钟 |
 | [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | 本机环境 | 网络/沙箱/编码等环境问题的诊断 |
 | [`docs/MOBILE-ARCHITECTURE.md`](docs/MOBILE-ARCHITECTURE.md) | 开发者 | 手机端架构评估与调试方案 |
@@ -176,7 +170,7 @@ pnpm build            # 产出 PWA 静态资源
 
 | 里程碑 | 状态 | 说明 |
 | --- | --- | --- |
-| 前置设计（8 条 ADR + 5 份文档） | ✅ | 见 `docs/` |
+| 前置设计（7 条 ADR + 多份文档） | ✅ | 见 `docs/` |
 | **M0 · 最小可用课表** | ✅ 已完成并验证 | 单仓骨架 / 完整数据模型 / Dexie 仓储 / 周视图 / 录课表单 / PWA 配置 |
 | M1 课表完整版 | ⏭ | 单双周与跳周录入界面、连堂拖拽、表格批量编辑、日视图、调课 |
 | M2 手机可用 | ⏭ | PWA 安装引导、离线、深色模式完善 |
@@ -199,9 +193,17 @@ pnpm build            # 产出 PWA 静态资源
 
 ## 当前状态
 
-**前置设计全部确认完毕，代码尚未生成。**
+**M0（最小可用课表）已完成并通过验证**，可以正常使用。
 
-- ✅ 七条 ADR 均已确认：见 [`docs/DECISIONS.md`](docs/DECISIONS.md)
-- ✅ 项目名已定：**几微 / jiwei**，含义记录在 [`docs/NAMING.md`](docs/NAMING.md)
-- ⏭ 下一步：按 [`docs/ROADMAP.md`](docs/ROADMAP.md) 初始化 **M0 · 最小可用课表**
-  （地基 + 完整模型 + 手动录课 + 周视图），目标是尽快让你在电脑和手机上真实看到自己的课表
+| 能力 | 状态 |
+| --- | --- |
+| 课程表（周视图、增删课程、单双周/跳周、连堂） | ✅ |
+| 作息时间逐节可编辑 | ✅ |
+| 手机端适配（PWA 可装到桌面、安全区、触摸目标） | ✅ |
+| 深色模式 | ✅ |
+| 本地数据备份与恢复（导出/导入 JSON） | ✅ |
+| 日程表 / 笔记 / 待办 / 闹钟 | ⏭ 排在后续里程碑，见 [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+
+**质量基线**：类型检查 5 个包全过 · 单元测试 72 个（core 52 + data 20）· 构建产物冒烟检查 14 项。
+
+**下一步**：按 [`docs/ROADMAP.md`](docs/ROADMAP.md) 推进 M1（课表完整版：表格批量编辑、日视图、调课界面）。

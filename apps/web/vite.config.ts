@@ -4,6 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  /**
+   * 用相对路径引用构建产物。
+   *
+   * 必须如此：部署到 GitHub Pages 时页面地址是 `用户名.github.io/jiwei/`，
+   * 默认的绝对路径 `/assets/...` 会指向域名根目录，导致 **JS/CSS 全部 404、页面白屏**。
+   * 相对路径在根目录与子目录下都能正确加载，也让本地直接打开 dist 文件可行。
+   */
+  base: './',
   plugins: [
     react(),
     tailwindcss(),
