@@ -49,9 +49,10 @@ export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
 
           return (
             <li key={course.id} className="flex items-center gap-3 px-3 py-2">
+              {/* 用课程自己的配色做色条，与课表网格保持一致 */}
               <span
                 className="h-8 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: paletteForBlock(course).border }}
+                style={{ backgroundColor: paletteForBlock(course).text }}
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{course.title}</div>

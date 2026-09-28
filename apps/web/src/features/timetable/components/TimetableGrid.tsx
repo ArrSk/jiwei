@@ -18,11 +18,33 @@ interface Props {
   onCellClick: (weekday: number, periodIndex: number) => void
 }
 
+/**
+ * 把周次数组压成一句人话：`1-16周`、`1-16单周`、`1,3,5周`。
+ * 空数组返回空串（调用方不渲染这一行）。
+ */
+export function formatWeeks(weeks: number[]): string {
+  if (weeks.length === 0) return ''
+  const sorted = [...weeks].sort((a, b) => a - b)
+  const contiguous = sorted.every((w, i) => i === 0 || w === (sorted[i - 1] ?? 0) + 1)
+  if (contiguous) return `${sorted[0]}-${sorted[sorted.length - 1]}周`
+
+  const allOdd = sorted.every((w) => w % 2 === 1)
+  const allEven = sorted.every((w) => w % 2 === 0)
+  const expectOdd = Array.from({ length: Math.ceil((sorted[sorted.length - 1] ?? 1) / 2) }, (_, i) => i * 2 + 1)
+  if (allOdd && expectOdd.length === sorted.length) return `1-${sorted[sorted.length - 1]}单周`
+  if (allEven) return `1-${sorted[sorted.length - 1]}双周`
+
+  return `${sorted.join(',')}周`
+}
+
 export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
   const gridBlocks: TimeGridBlock[] = blocks.map(
     ({ block, occ, weekday, periodStart, periodEnd }) => {
       // 一门课一种颜色：用户自选优先，否则按课程名稳定派生
       const palette = paletteForBlock(block)
+      // 周次只对"教学周"类课程有意义
+      const weeksLabel =
+        block.anchor.type === 'curriculum' ? formatWeeks(block.anchor.weeks) : ''
 
       return {
         id: occ.id,
@@ -30,27 +52,23 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
         periodStart,
         periodEnd,
         muted: occ.status === 'cancelled',
-        // 浅色浮起底 + 同色系深字；左侧竖线由 TimeGrid 的 border-left 承担
-        style: {
-          backgroundColor: palette.bg,
-          borderLeftColor: palette.border,
-          color: palette.text,
-        },
-        // 关键：课程名与地点都**不允许截断**（不加 truncate），
-        // 手机上要能完整显示课程全名——换行比截断重要。
-        // 文字横向居中；层级：课程名（醒目）→ 地点（次要，带 @）→ 老师（仅宽屏）。
+        style: { backgroundColor: palette.bg, color: palette.text },
+        // 版式对齐参考示例：
+        //   课程名加粗在上；下面依次是「@老师」「@教室」「周次」，小字、稍透明、**右对齐**。
+        // 课程名**不加 truncate**：手机上要能完整显示，换行比截断重要。
         content: (
-          <span className="flex h-full min-w-0 flex-col items-center gap-[1px] overflow-hidden text-center">
+          <span className="flex h-full min-w-0 flex-col gap-[2px] overflow-hidden">
             <span className="font-semibold [overflow-wrap:anywhere]">{block.title}</span>
-            {block.detail?.location ? (
-              <span className="opacity-90 [overflow-wrap:anywhere]">@{block.detail.location}</span>
-            ) : null}
-            {block.detail?.teacher ? (
-              <span className="hidden opacity-75 [overflow-wrap:anywhere] sm:block">
-                {block.detail.teacher}
-              </span>
-            ) : null}
-            {occ.status === 'moved' ? <span className="mt-auto opacity-90">调课</span> : null}
+            <span className="flex min-w-0 flex-col items-end text-right text-[10px] leading-[1.35] opacity-85">
+              {block.detail?.teacher ? (
+                <span className="[overflow-wrap:anywhere]">@{block.detail.teacher}</span>
+              ) : null}
+              {block.detail?.location ? (
+                <span className="[overflow-wrap:anywhere]">@{block.detail.location}</span>
+              ) : null}
+              {weeksLabel ? <span>{weeksLabel}</span> : null}
+              {occ.status === 'moved' ? <span>调课</span> : null}
+            </span>
           </span>
         ),
       } satisfies TimeGridBlock

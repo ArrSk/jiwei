@@ -90,29 +90,19 @@
   /*
    * 课表空白格。
    *
-   * 设计取舍：底色**不**用多个 `bg-*` Tailwind 类互相覆盖
-   * （哪个生效取决于它们在产物 CSS 里的先后顺序，不可控），
-   * 而是由这里统一给出，UI 包只负责输出语义类名。
+   * 底色**透明**（而不是不透明的 surface 色）—— 这样父容器的底色与
+   * 单元格上的横向淡线能正常显示；早期写成不透明色时，淡分割线会被盖住。
    */
   .tg-cell {
-    background-color: var(--color-surface);
+    background-color: transparent;
     transition:
       box-shadow 120ms ease,
       background-color 120ms ease;
   }
 
-  /* 隔行浅色：相邻两节用不同底色区分，比分割线更柔和 */
-  .tg-cell--alt {
-    background-color: color-mix(in oklab, var(--color-surface-alt) 55%, var(--color-surface));
-  }
-
-  /* 今天那一整列：淡淡的主题色底 */
+  /* 今天那一整列：极淡的主题色底（示例里今日只在表头着色，这里保留列底以利定位） */
   .tg-cell--today {
-    background-color: color-mix(in oklab, var(--color-brand) 8%, var(--color-surface));
-  }
-
-  .tg-cell--today.tg-cell--alt {
-    background-color: color-mix(in oklab, var(--color-brand) 13%, var(--color-surface));
+    background-color: color-mix(in oklab, var(--color-brand) 6%, transparent);
   }
 
   /*
@@ -122,8 +112,8 @@
    * 与课表整体的柔和调性不符，因此改为：底色极轻微提亮 + 一层柔和投影。
    */
   .tg-cell--interactive:hover {
-    background-color: color-mix(in oklab, var(--color-brand) 7%, var(--color-surface));
-    box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.06);
+    background-color: color-mix(in oklab, var(--color-brand) 10%, transparent);
+    box-shadow: inset 0 0 0 1px rgb(15 23 42 / 0.05);
     z-index: 20;
   }
 

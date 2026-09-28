@@ -67,10 +67,13 @@ const css = cssFiles
 
 /** Tailwind 会转义特殊字符，按同样规则匹配 */
 const tw = (name) => `.${name.replace(/[.[\]%()./:#,]/g, (c) => `\\${c}`)}`
+/**
+ * 这些类必须在产物 CSS 里，否则说明样式没生效。
+ * 改版时若删掉某个类，记得同步这里 —— 否则会出现"检查通过但其实样式丢了"的假象。
+ */
 const mustHaveClasses = [
-  'tg-cell', // 网格格子
-  'tg-cell--alt', // 隔行浅色
-  'tg-cell--today', // 今日列
+  'tg-cell', // 网格格子（透明底，横向淡线）
+  'tg-cell--today', // 今日列的极淡着色
   'min-h-[44px]', // 手机触摸目标
   'max-w-[640px]', // 表单弹层宽度
 ]

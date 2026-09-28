@@ -89,7 +89,7 @@ export function TimeGrid({
       className={clsx('tg-root tg-grid overflow-hidden', className)}
       style={
         {
-          // 轴列要放下「1 / 08:00 / 08:45」三行（字号已调大到接近参考图）
+          // 轴列要放下「1 / 08:00 / 08:45」三行
           '--tg-axis': 'clamp(2.7rem, 13vw, 3.7rem)',
           // 行高：给换行的课程名留出空间，同时保证相邻两节仍有区分度
           '--tg-row-h': 'clamp(3rem, 10.5vw, 4.2rem)',
@@ -102,62 +102,66 @@ export function TimeGrid({
             注意 sticky + z-30 是**必须的**：课程块是 z-10，表头若没有定位与 z-index，
             跨节的大色块会直接盖住表头（初版就出现过这个 bug）。 */}
         <div
-          className="sticky top-0 z-30 border-b border-border bg-surface-alt"
+          className="sticky top-0 z-30 bg-surface-alt"
           style={{ gridColumn: 1, gridRow: headerRow }}
         />
         {columns.map((col) => (
           <div
             key={`head-${col.weekday}`}
-            className={clsx(
-              'sticky top-0 z-30 flex flex-col items-center justify-center gap-[2px] border-b border-l border-border py-1',
-              col.isToday ? 'bg-brand-soft/50' : 'bg-surface-alt',
-            )}
+            className="sticky top-0 z-30 flex items-center justify-center bg-surface-alt px-0.5 py-1"
             style={{ gridColumn: col.weekday + 1, gridRow: headerRow }}
           >
-            {/* 表头两行：星期名大、日期小（参考成熟课表的层级） */}
-            <span
+            {/*
+              表头做成**一整块的圆角胶囊**：今日整块填主题色、文字变白。
+              这比"只给日期变色"醒目得多，也与你提供的示例一致。
+            */}
+            <div
               className={clsx(
-                'text-[12px] leading-none sm:text-[13px]',
-                col.isToday ? 'font-semibold text-brand' : 'font-medium text-ink',
+                'flex w-full flex-col items-center justify-center rounded-lg py-0.5 leading-tight',
+                col.isToday ? 'bg-brand text-white' : '',
               )}
             >
-              {col.title}
-            </span>
-            {col.sub ? (
-              <span className="text-[10px] leading-none text-muted sm:text-[11px]">
-                {col.sub}
+              <span
+                className={clsx(
+                  'text-[15px] leading-tight',
+                  col.isToday ? 'font-semibold text-white' : 'font-semibold text-ink',
+                )}
+              >
+                {col.title}
               </span>
-            ) : null}
+              {col.sub ? (
+                <span
+                  className={clsx(
+                    'text-[11px] leading-tight',
+                    col.isToday ? 'text-white/85' : 'text-muted',
+                  )}
+                >
+                  {col.sub}
+                </span>
+              ) : null}
+            </div>
           </div>
         ))}
 
         {/* 行：左侧节次轴 + 7 天空白格。
-            相邻节次用**交替浅色**区分（比分割线更柔和），鼠标悬停的格子浮起阴影作为反馈。 */}
+            分割方式：**只有横向的淡线，没有竖线**（列与列靠留白区分，与示例一致）。 */}
         {layoutRows.map((row) => {
           const gridRow = firstBodyGridRow + row.gridIndex
           const [startTime, endTime] = row.sub?.split('-') ?? []
 
           return (
             <div key={`row-${row.index}`} style={{ display: 'contents' }}>
-              {/* 节次轴：三行 —— 节次号大、开始与结束时间小。
-                  参考成熟课表的轴列格式：数字最醒目，时刻分两行辅助。 */}
+              {/* 节次轴：节次号醒目、起止时间小字辅助 */}
               <div
-                className={clsx(
-                  'tg-cell flex flex-col items-center justify-center gap-[2px] border-b border-border text-muted',
-                  row.striped && 'tg-cell--alt',
-                )}
+                className="tg-cell flex flex-col items-center justify-center gap-[1px] text-muted"
                 style={{ gridColumn: 1, gridRow }}
               >
-                <span className="text-[12px] font-medium leading-none text-ink sm:text-[13px]">
-                  {row.label}
-                </span>
+                <span className="text-[13px] font-semibold leading-none text-ink">{row.label}</span>
                 {startTime ? (
-                  <span className="text-[9px] leading-none sm:text-[10px]">{startTime}</span>
+                  <span className="text-[10px] leading-tight sm:text-[10px]">{startTime}</span>
                 ) : null}
                 {endTime ? (
-                  <span className="text-[9px] leading-none opacity-80 sm:text-[10px]">
-                    {endTime}
-                  </span>
+                  <span className="text-[10px] leading-tight sm:text-[10px]">{endTime}</span>
                 ) : null}
               </div>
 
@@ -169,9 +173,8 @@ export function TimeGrid({
                   aria-label={`${col.title} 第 ${row.index} 节`}
                   onClick={() => onCellClick?.(col.weekday, row.index)}
                   className={clsx(
-                    // 极淡分割线；相邻两节靠交替浅色区分（类名语义化，样式见 web 端 styles.css）
-                    'tg-cell border-b border-l border-border',
-                    row.striped && 'tg-cell--alt',
+                    // 只有横向淡线，没有竖线；今日那一列轻微着色
+                    'tg-cell border-t border-border',
                     col.isToday && 'tg-cell--today',
                     onCellClick && 'tg-cell--interactive cursor-pointer',
                   )}
@@ -190,7 +193,8 @@ export function TimeGrid({
           return (
             <div
               key={block.id}
-              className="min-w-0 p-[1px]"
+              // 内边距 2px：卡片之间留出细缝，与示例的 `margin: 2px` 一致
+              className="min-w-0 p-[2px]"
               style={{
                 gridColumn: block.weekday + 1,
                 gridRow: `${firstBodyGridRow + startIdx} / ${firstBodyGridRow + endIdx + 1}`,
@@ -203,15 +207,12 @@ export function TimeGrid({
                 className={clsx(
                   // 注意：**不加 truncate**。课程名要换行完整显示，
                   // 截断成"高等数…"在手机上是不可接受的（内容比整齐更重要）。
-                  'block h-full w-full min-w-0 overflow-hidden rounded-l-[3px] rounded-r-md',
-                  // 左侧同色竖线 + 极淡外描边：与成熟课表的卡片观感一致
-                  'border-l-[3px] px-1 py-0.5 text-left shadow-[0_1px_2px_rgb(15_23_42/0.06)]',
-                  // 手机上每列约 45px，11px 中文每行约 4 字；行高收到 1.15 以多容纳一行
-                  'text-[11px] leading-[1.15] sm:text-[12px]',
+                  // 观感对齐示例：圆角 10px、无描边、无阴影，纯色块。
+                  'flex h-full w-full min-w-0 flex-col gap-[2px] overflow-hidden rounded-[10px] px-[5px] py-[5px] text-left',
+                  // 手机上每列约 45px，11px 中文每行约 4 字；行高收紧以多容纳一行
+                  'text-[11px] leading-[1.35] sm:text-[12px]',
                   '[overflow-wrap:anywhere]', // 超长英文名也强制断行，不撑破色块
-                  block.muted
-                    ? 'border-dashed border-border bg-surface-alt text-muted line-through'
-                    : 'border-transparent',
+                  block.muted && 'opacity-45 grayscale',
                   block.onClick ? 'cursor-pointer' : 'cursor-default',
                   block.className,
                 )}
@@ -234,8 +235,6 @@ interface LayoutRow {
   sub?: string
   /** 在本网格里的行序号（0 起，从表头下方第一行算） */
   gridIndex: number
-  /** 是否为隔行行 —— 用交替浅色区分相邻两节 */
-  striped: boolean
 }
 
 interface Layout {
@@ -259,8 +258,6 @@ function buildRows(rows: TimeGridRow[]): Layout {
     index: row.index,
     label: row.label,
     gridIndex: i,
-    // 隔行换浅色，用来区分相邻两节
-    striped: i % 2 === 1,
     ...(row.sub ? { sub: row.sub } : {}),
   }))
 

@@ -203,20 +203,25 @@ export function CourseForm({
               自
             </button>
             {BLOCK_PALETTES.map((p) => {
-              const selected = value.color === p.bg
+              // 存的是**色名**（如 green），渲染时再查底色与文字色；
+              // 也兼容旧数据里存的色值，选中态两种都能识别。
+              const selected = value.color === p.name || value.color === p.bg
               return (
                 <button
-                  key={p.label}
+                  key={p.name}
                   type="button"
                   title={p.label}
                   aria-label={`颜色 ${p.label}`}
-                  onClick={() => patch({ color: p.bg })}
+                  onClick={() => patch({ color: p.name })}
                   className={
-                    'h-7 w-7 rounded-full border-2 transition-transform active:scale-95 ' +
-                    (selected ? 'border-ink' : 'border-transparent')
+                    'h-8 w-8 rounded-full border-2 transition-transform active:scale-95 ' +
+                    (selected ? 'border-ink' : 'border-black/10')
                   }
-                  style={{ backgroundColor: p.border }}
-                />
+                  // 色块用它自己的底色 + 同色系文字，所见即所得
+                  style={{ backgroundColor: p.bg, color: p.text }}
+                >
+                  <span className="text-[11px]">{p.label}</span>
+                </button>
               )
             })}
           </div>

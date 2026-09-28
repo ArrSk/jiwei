@@ -6,6 +6,7 @@
  */
 import { allWeeks, makeCourse } from '@jiwei/data'
 import type { Block, Semester } from '@jiwei/core'
+import type { ColorName } from './palette'
 
 export interface DemoCourseSpec {
   title: string
@@ -14,6 +15,8 @@ export interface DemoCourseSpec {
   weeks: number[]
   teacher?: string
   location?: string
+  /** 显式指定色名，让 7 组配色都能展示出来 */
+  color: ColorName
 }
 
 /** 一份典型的大二课表（含单双周与连堂，用来顺带验证展开逻辑） */
@@ -30,6 +33,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: weeks.filter((w) => w <= 16),
       teacher: '张建国',
       location: '教三 201',
+      color: 'blue',
     },
     {
       title: '大学英语',
@@ -38,6 +42,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: weeks.filter((w) => w <= 16),
       teacher: '李梅',
       location: '外语楼 305',
+      color: 'red',
     },
     {
       title: '线性代数',
@@ -46,6 +51,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: weeks.filter((w) => w <= 16),
       teacher: '王强',
       location: '教二 108',
+      color: 'cyan',
     },
     {
       title: '大学物理',
@@ -54,6 +60,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: weeks.filter((w) => w <= 16),
       teacher: '陈志远',
       location: '理科楼 402',
+      color: 'purple',
     },
     {
       title: '数据结构',
@@ -62,6 +69,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks,
       teacher: '刘伟',
       location: '计算机楼 501',
+      color: 'green',
     },
     {
       title: '体育（篮球）',
@@ -69,6 +77,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       periods: [5, 6],
       weeks: odd.filter((w) => w <= 16),
       location: '东操场',
+      color: 'orange',
     },
     {
       title: '大学物理实验',
@@ -77,6 +86,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: even,
       teacher: '陈志远',
       location: '物理实验中心 B203',
+      color: 'yellow',
     },
     {
       title: '毛泽东思想概论',
@@ -85,6 +95,7 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: weeks.filter((w) => w <= 16),
       teacher: '赵敏',
       location: '文科楼 210',
+      color: 'yellow',
     },
     {
       title: '数据结构上机',
@@ -93,11 +104,12 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: weeks.filter((w) => w % 3 === 0),
       teacher: '刘伟',
       location: '机房 A',
+      color: 'green',
     },
   ]
 
-  return specs.map((s) =>
-    makeCourse({
+  return specs.map((s) => {
+    const block = makeCourse({
       semesterId: semester.id,
       title: s.title,
       weekday: s.weekday,
@@ -105,9 +117,12 @@ export function buildDemoCourses(semester: Semester): Block[] {
       weeks: s.weeks,
       ...(s.teacher ? { teacher: s.teacher } : {}),
       ...(s.location ? { location: s.location } : {}),
-    }),
-  )
+    })
+    // 给示例课程**显式指定色名**，让 7 组配色全部露出来（否则会撞色）。
+    // 用户自己新增的课程留空，由 paletteForBlock 按课名稳定派生。
+    return { ...block, color: s.color }
+  })
 }
 
-// 课程配色统一由 `lib/palette.ts` 的 paletteForTitle(课程名) 提供，
-// 这里不再维护第二套色板（避免"存了颜色但渲染不用"的两套真相）。
+// 课程配色由 `lib/palette.ts` 提供（色值取自 plugin-campus 示例），
+// 这里只负责给示例数据指定色名，不维护第二套色板。

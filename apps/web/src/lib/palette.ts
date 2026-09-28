@@ -1,47 +1,58 @@
 /**
  * 课程配色。
  *
- * 采用**浅色浮起底 + 同色系深字 + 左侧同色竖线**（与成熟课表 App 一致）：
- * 长时间盯屏更柔和，且深字浅底的对比度比"白字彩底"更高。
- * 每个色板给出配套的 bg / border / text，保证三者永远同色系。
+ * 色值直接取自 `plugin-campus/index.html` 的 7 组配色，保持与之完全一致的观感：
+ * **浅色底 + 同色系深字**（长时间盯屏柔和，且深字浅底的对比度比白字彩底更高）。
  */
 
+export type ColorName = 'green' | 'blue' | 'yellow' | 'red' | 'purple' | 'orange' | 'cyan'
+
 export interface BlockPalette {
-  /** 中文显示名，便于将来做"手动指定颜色" */
+  /** 色名（落库时存这个） */
+  name: ColorName
+  /** 中文显示名，用于配色选择器的提示 */
   label: string
-  /** 卡片底色（很浅） */
+  /** 卡片底色（浅） */
   bg: string
-  /** 左侧竖线与描边（中等饱和） */
-  border: string
-  /** 正文颜色（很深，保证对比度） */
+  /** 正文颜色（同色系深色，保证对比度） */
   text: string
 }
 
-/** 10 组柔和色板，刻意避开刺眼的纯红/纯绿 */
+/** 7 组配色，色值与你提供的示例完全一致 */
 export const BLOCK_PALETTES: BlockPalette[] = [
-  { label: '粉', bg: '#fdeaf1', border: '#f19ec2', text: '#9d2e63' },
-  { label: '杏', bg: '#fdeee0', border: '#f3bd85', text: '#9a5b16' },
-  { label: '蜜', bg: '#fbf5da', border: '#e8d27a', text: '#8a6d13' },
-  { label: '芽', bg: '#eef7e0', border: '#bcdd8a', text: '#4f6f1d' },
-  { label: '翠', bg: '#e2f5ec', border: '#97d6ba', text: '#1f6b4d' },
-  { label: '青', bg: '#e0f4f6', border: '#8fd2da', text: '#17646d' },
-  { label: '湖', bg: '#e4effa', border: '#9cc3e8', text: '#1f5388' },
-  { label: '黛', bg: '#ece7fa', border: '#b9a7ea', text: '#513a97' },
-  { label: '紫', bg: '#f7e8f8', border: '#ddaae1', text: '#83358a' },
-  { label: '石', bg: '#eceff3', border: '#b6c1cd', text: '#42505f' },
+  { name: 'green', label: '绿', bg: '#e3f6e5', text: '#3d9c4e' },
+  { name: 'blue', label: '蓝', bg: '#e0edff', text: '#4a7de0' },
+  { name: 'yellow', label: '黄', bg: '#fdf6d8', text: '#b8971f' },
+  { name: 'red', label: '红', bg: '#fde3e3', text: '#e05a5a' },
+  { name: 'purple', label: '紫', bg: '#f1e4fb', text: '#9b59d0' },
+  { name: 'orange', label: '橙', bg: '#fdeadb', text: '#e08a3c' },
+  { name: 'cyan', label: '青', bg: '#dcf3f6', text: '#3aa6b5' },
 ]
 
-/** 常见课程 → 固定色板下标，避免中文课名哈希后撞色 */
-const SEED_INDEX: Array<[RegExp, number]> = [
-  [/高数|高等数学|数学/, 6], // 湖蓝
-  [/英语|外语/, 0], // 粉
-  [/物理/, 5], // 青
-  [/化学/, 4], // 翠
-  [/思想|政治|马克思|毛概|近代史|军事/, 2], // 蜜黄
-  [/体育|篮球|足球/, 1], // 杏
-  [/计算机|程序|数据结构|算法|软件/, 7], // 黛紫
-  [/电路|电子|信号/, 6], // 湖蓝
-  [/实验/, 5], // 青
+/** 停课等失效场次：置灰 */
+export const MUTED_PALETTE: BlockPalette = {
+  name: 'green',
+  label: '失效',
+  bg: '#f1f5f9',
+  text: '#94a3b8',
+}
+
+const BY_NAME = new Map(BLOCK_PALETTES.map((p) => [p.name, p]))
+
+/**
+ * 常见课程 → 固定配色，避免中文课名哈希后撞色。
+ * 这套映射刻意让示例课表覆盖多个色系（数学蓝、英语红、物理青、体育橙…）。
+ */
+const SEED_COLOR: Array<[RegExp, ColorName]> = [
+  [/高数|高等数学|数学|线性代数/, 'blue'],
+  [/英语|外语/, 'red'],
+  [/物理/, 'cyan'],
+  [/化学/, 'green'],
+  [/思想|政治|马克思|毛概|近代史|军事/, 'yellow'],
+  [/体育|篮球|足球/, 'orange'],
+  [/计算机|程序|数据结构|算法|软件/, 'purple'],
+  [/电路|电子|信号/, 'blue'],
+  [/实验/, 'green'],
 ]
 
 /** 课程名的稳定哈希 */
@@ -53,24 +64,32 @@ function hashTitle(title: string): number {
   return hash
 }
 
-/** 取课程色板：优先匹配常见课程，其次按名称哈希。同一门课颜色永远稳定。 */
-export function paletteForTitle(title: string): BlockPalette {
-  for (const [pattern, index] of SEED_INDEX) {
-    if (pattern.test(title)) return BLOCK_PALETTES[index] ?? BLOCK_PALETTES[0]!
+/** 由课程名派生的色名：优先匹配常见课程，其次按名称哈希 */
+export function colorNameForTitle(title: string): ColorName {
+  for (const [pattern, name] of SEED_COLOR) {
+    if (pattern.test(title)) return name
   }
-  return BLOCK_PALETTES[hashTitle(title) % BLOCK_PALETTES.length] ?? BLOCK_PALETTES[0]!
+  return BLOCK_PALETTES[hashTitle(title) % BLOCK_PALETTES.length]!.name
 }
 
 /**
- * 按"课程自选颜色"取完整色板。
+ * 取课程配色。
  *
- * 表单里用户选的是某个色板的 `bg`（浅底），这里把配套的左边线与文字色一并取回；
- * 若色值不在内置色板里（例如来自旧数据），就以该色为底、沿用标题派生的文字色，
- * 保证"深字浅底"的对比度不被破坏。
+ * `block.color` 里存的是**色名**（如 `blue`）；旧数据可能存的是色值，
+ * 两种情况都能识别，未知值则退回按课名派生，保证永远有可用配色。
  */
 export function paletteForBlock(block: { title: string; color?: string }): BlockPalette {
-  const fallback = paletteForTitle(block.title)
-  if (!block.color) return fallback
-  const known = BLOCK_PALETTES.find((p) => p.bg === block.color)
-  return known ?? { ...fallback, bg: block.color }
+  const stored = block.color?.trim()
+  if (stored) {
+    const byName = BY_NAME.get(stored as ColorName)
+    if (byName) return byName
+    const byBg = BLOCK_PALETTES.find((p) => p.bg === stored)
+    if (byBg) return byBg
+  }
+  return BY_NAME.get(colorNameForTitle(block.title)) ?? BLOCK_PALETTES[0]!
+}
+
+/** 按色名取配色（表单里选色时用） */
+export function paletteByName(name: ColorName): BlockPalette {
+  return BY_NAME.get(name) ?? BLOCK_PALETTES[0]!
 }
