@@ -29,6 +29,16 @@ interface UiState {
   view: 'timetable' | 'calendar'
   setView: (view: 'timetable' | 'calendar') => void
 
+  /**
+   * 正在查看的**某一天**（1=周一 … 7=周日）。
+   *
+   * `null` = 周视图（看整周）；设为数字 = **日视图**（只看那一天）。
+   * 放进 store 的理由：顶部星期条的点击要切换它，而星期条与内容区
+   * 虽在同一模块、却分属不同组件，放 store 比层层传 prop 干净。
+   */
+  dayViewWeekday: number | null
+  setDayViewWeekday: (weekday: number | null) => void
+
   /** 当前正在查看的学期；null 表示"跟随活跃学期" */
   semester: Semester | null
   setSemester: (semester: Semester | null) => void
@@ -50,7 +60,11 @@ export const useUiStore = create<UiState>((set) => ({
   setActiveModuleId: (id) => set({ activeModuleId: id }),
 
   view: 'timetable',
-  setView: (view) => set({ view }),
+  // 切走时顺手退出日视图：留在"只看周三"的状态回到课表会让人以为课丢了
+  setView: (view) => set({ view, ...(view === 'calendar' ? { dayViewWeekday: null } : {}) }),
+
+  dayViewWeekday: null,
+  setDayViewWeekday: (weekday) => set({ dayViewWeekday: weekday }),
 
   semester: null,
   setSemester: (semester) => set({ semester, week: null }),

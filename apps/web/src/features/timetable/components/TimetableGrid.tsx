@@ -20,11 +20,21 @@ interface Props {
   onCellClick: (weekday: number, periodIndex: number) => void
   /** 点课程块（进入编辑） */
   onBlockClick?: (block: Block) => void
+  /** 点星期列头（进入日视图） */
+  onColumnClick?: (weekday: number) => void
   /** 表头左上角格子的内容（课表在这里放月份） */
   corner?: ReactNode
 }
 
-export function TimetableGrid({ rows, columns, blocks, onCellClick, onBlockClick, corner }: Props) {
+export function TimetableGrid({
+  rows,
+  columns,
+  blocks,
+  onCellClick,
+  onBlockClick,
+  onColumnClick,
+  corner,
+}: Props) {
   const gridBlocks: TimeGridBlock[] = blocks.map(
     ({ block, occ, weekday, periodStart, periodEnd }) => {
       // 一门课一种颜色：用户自选优先，否则按课程名稳定派生
@@ -78,6 +88,7 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick, onBlockClick
         blocks={gridBlocks}
         corner={corner}
         onCellClick={onCellClick}
+        {...(onColumnClick ? { onColumnClick } : {})}
       />
     </div>
   )

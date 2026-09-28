@@ -61,6 +61,11 @@ export interface TimeGridProps {
   blocks: TimeGridBlock[]
   /** 点击网格空白处 */
   onCellClick?: (weekday: number, periodIndex: number) => void
+  /**
+   * 点击列头（星期几）。
+   * 课表用它切到**日视图** —— 手机上一列只有约 45px，点开某一天才看得清细节。
+   */
+  onColumnClick?: (weekday: number) => void
   /** 行高，默认用 CSS clamp 自适应；传入则固定 */
   rowHeight?: number
   /**
@@ -78,6 +83,7 @@ export function TimeGrid({
   columns,
   blocks,
   onCellClick,
+  onColumnClick,
   rowHeight,
   corner,
   showHeader = true,
@@ -130,10 +136,16 @@ export function TimeGrid({
                 style={{ gridColumn: col.weekday + 1, gridRow: 1 }}
               >
                 {/* 今日整块填主题色 + 白字，比"只给日期上色"醒目得多 */}
-                <div
+                <button
+                  type="button"
+                  tabIndex={onColumnClick ? 0 : -1}
+                  disabled={!onColumnClick}
+                  aria-label={onColumnClick ? `查看${col.title}当天的全部课程` : undefined}
+                  onClick={onColumnClick ? () => onColumnClick(col.weekday) : undefined}
                   className={clsx(
                     'flex w-full flex-col items-center justify-center rounded-lg py-0.5 leading-tight',
                     col.isToday && 'bg-brand text-white',
+                    onColumnClick && 'cursor-pointer active:opacity-80',
                   )}
                 >
                   <span
@@ -154,7 +166,7 @@ export function TimeGrid({
                       {col.sub}
                     </span>
                   ) : null}
-                </div>
+                </button>
               </div>
             ))}
           </>

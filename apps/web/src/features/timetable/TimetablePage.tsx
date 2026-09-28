@@ -8,6 +8,10 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   currentWeek as coreCurrentWeek,
   dateForWeek,
+  nextOccurrence,
+  nowIso,
+  ongoingOccurrences,
+  occurrencesOnDate,
   today,
   weekdayOf,
   WEEKDAY_LABELS,
@@ -31,15 +35,12 @@ import { allWeeks } from '@jiwei/data'
 import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
+import { TodayCard } from './components/TodayCard'
+import { DayView } from './components/DayView'
 import { SettingsPage } from '../../shell/SettingsPage'
-import { weeksToFormText } from '../../lib/weeks'
+import { weeksToFormText, periodStartOf } from '../../lib/weeks'
 
 /** 从确定性 Occurrence ID 里取回节次：`occ_<blockId>#<date>#<periodStart>` */
-function periodStartOf(occId: string): number {
-  const last = occId.split('#').pop()
-  const n = Number(last)
-  return Number.isFinite(n) ? n : 0
-}
 
 /**
  * 把作息表转成网格行。
@@ -129,7 +130,8 @@ export function blockToFormValue(block: Block): CourseFormValue {
 
 export function TimetablePage() {
   const { repos, refresh, dataVersion } = useJiwei()
-  const { semester, setSemester, week, setWeek, toast, view, setView } = useUiStore()
+  const { semester, setSemester, week, setWeek, toast, view, setView, dayViewWeekday, setDayViewWeekday } =
+    useUiStore()
 
   const [blocks, setBlocks] = useState<Block[]>([])
   const [occurrences, setOccurrences] = useState<Occurrence[]>([])
@@ -228,6 +230,28 @@ export function TimetablePage() {
     }
     return out
   }, [occurrences, blockById, semester, viewWeek])
+
+  /**
+   * 「今天 / 下一节」卡片的数据。
+   *
+   * 只在**正在看本周**时显示 —— 翻到第 8 周却提示"下一节是高数"会让人误以为
+   * 说的是本周的安排。`nowIso()` 每次渲染重算，够用且不必引入定时器。
+   */
+  const todayCard = useMemo(() => {
+    if (viewWeek !== currentWeek) return null
+    const now = nowIso()
+    return {
+      ongoing: ongoingOccurrences(occurrences, now),
+      next: nextOccurrence(occurrences, now),
+    }
+  }, [occurrences, viewWeek, currentWeek])
+
+  /** 日视图那一天的日期与场次（`dayViewWeekday` 为 null 时不用） */
+  const dayView = useMemo(() => {
+    if (dayViewWeekday === null || !semester) return null
+    const date = dateForWeek(semester, viewWeek, dayViewWeekday)
+    return { weekday: dayViewWeekday, date, list: occurrencesOnDate(occurrences, date) }
+  }, [dayViewWeekday, occurrences, semester, viewWeek])
 
   // ── 操作 ────────────────────────────────────────────────────
   async function persistAndReload(successText: string): Promise<void> {
@@ -400,34 +424,75 @@ export function TimetablePage() {
       {/* ── 内容区：唯一可滚动的部分 ─────────────────────── */}
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {view === 'timetable' ? (
-          <>
-            {blocks.length === 0 ? (
-              <div className="p-3">
-                <EmptyState onLoadDemo={handleLoadDemo} onAdd={() => setSheetOpen(true)} />
+          dayView ? (
+            /*
+              日视图：一列铺满屏宽。
+              顶部那行「周几 · 日期 · 返回整周」是唯一的出口 —— 手机上很容易
+              点进某一天却不知道怎么退回，返回入口必须在第一屏、不用滚动。
+            */
+            <>
+              <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-1.5">
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg border border-border px-2 py-1 text-[12px] text-muted hover:bg-surface-alt"
+                  onClick={() => setDayViewWeekday(null)}
+                >
+                  ← 整周
+                </button>
+                <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                  第 {viewWeek} 周 · 只看这一天
+                </span>
               </div>
-            ) : (
-              <TimetableGrid
-                rows={buildRows(periods)}
-                columns={buildColumns(semester, viewWeek, todayStr)}
-                blocks={gridBlocks}
-                /* 表头左上角（节次轴那一列）放月份，于是整条表头与网格天然对齐 */
-                corner={
-                  <div className="flex flex-col items-center justify-center leading-tight">
-                    <span className="text-[15px] font-semibold">
-                      {Number(dateForWeek(semester, viewWeek, 1).slice(5, 7))}
-                    </span>
-                    <span className="text-[11px] text-muted">月</span>
-                  </div>
-                }
-                onCellClick={(weekday, periodIndex) => openAdd(weekday, periodIndex)}
-                onBlockClick={openEdit}
+              <DayView
+                occurrences={dayView.list}
+                blockById={blockById}
+                date={dayView.date}
+                isToday={dayView.date === todayStr}
+                onOpen={openEdit}
+                onAddAt={(periodIndex) => openAdd(dayView.weekday, periodIndex)}
               />
-            )}
-            {/* 课程总览紧接在表格下方（与表格同处一个滚动区），不单独占页签 */}
-            {blocks.length > 0 ? (
-              <CourseList courses={blocks} onDelete={handleDelete} onLoadDemo={handleLoadDemo} />
-            ) : null}
-          </>
+            </>
+          ) : (
+            <>
+              {todayCard ? (
+                <TodayCard
+                  ongoing={todayCard.ongoing}
+                  next={todayCard.next}
+                  blockById={blockById}
+                  onOpen={openEdit}
+                />
+              ) : null}
+
+              {blocks.length === 0 ? (
+                <div className="p-3">
+                  <EmptyState onLoadDemo={handleLoadDemo} onAdd={() => setSheetOpen(true)} />
+                </div>
+              ) : (
+                <TimetableGrid
+                  rows={buildRows(periods)}
+                  columns={buildColumns(semester, viewWeek, todayStr)}
+                  blocks={gridBlocks}
+                  /* 表头左上角（节次轴那一列）放月份，于是整条表头与网格天然对齐 */
+                  corner={
+                    <div className="flex flex-col items-center justify-center leading-tight">
+                      <span className="text-[15px] font-semibold">
+                        {Number(dateForWeek(semester, viewWeek, 1).slice(5, 7))}
+                      </span>
+                      <span className="text-[11px] text-muted">月</span>
+                    </div>
+                  }
+                  onCellClick={(weekday, periodIndex) => openAdd(weekday, periodIndex)}
+                  onBlockClick={openEdit}
+                  /* 点星期头进入日视图：手机上这是看清一节课细节的主要入口 */
+                  onColumnClick={setDayViewWeekday}
+                />
+              )}
+              {/* 课程总览紧接在表格下方（与表格同处一个滚动区），不单独占页签 */}
+              {blocks.length > 0 ? (
+                <CourseList courses={blocks} onDelete={handleDelete} onLoadDemo={handleLoadDemo} />
+              ) : null}
+            </>
+          )
         ) : (
           <CalendarPlaceholder />
         )}
