@@ -261,6 +261,9 @@ export function TimetablePage() {
     return <div className="p-6 text-sm text-muted">还没有学期数据，请重新打开应用以完成初始化。</div>
   }
 
+  /** 一学期实际要上多少次课（排除被停课的场次），用于顶部统计 */
+  const totalOccurrences = occurrences.filter((o) => o.status !== 'cancelled').length
+
   return (
     /*
       整页骨架（对齐参考示例）：
@@ -271,34 +274,19 @@ export function TimetablePage() {
       用 h-full + flex 而不是让整页滚动 —— 这样底部页签才会**锁定**在屏幕底部。
     */
     <div className="flex h-full flex-col bg-canvas">
-      {/* ── 顶部：第一行标题，第二行工具 ─────────────────── */}
-      <header className="shrink-0 bg-surface px-3 pb-1.5 pt-2">
-        <div className="flex items-start justify-between gap-2">
-          {/* 周次：点一下回到本周 */}
-          <button
-            type="button"
-            className="min-w-0 text-left"
-            title={week !== null ? '点一下回到本周' : '当前显示本周'}
-            onClick={() => setWeek(null)}
-          >
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-[17px] font-semibold leading-tight">
-                第 {viewWeek} 周
-              </span>
-              <span className="text-[13px] leading-tight text-muted">
-                {weekdayLabel(dateForWeek(semester, viewWeek, 1))}
-              </span>
-              {viewWeek === currentWeek ? (
-                <span className="rounded bg-brand-soft px-1 py-px text-[10px] text-brand">本周</span>
-              ) : null}
-            </div>
-            <div className="text-[12px] leading-tight text-muted">
-              {dateForWeek(semester, viewWeek, 1).replace(/-/g, '/')}
-            </div>
-          </button>
+      {/* ── 顶部控制栏 ───────────────────────────────────── */}
+      <header className="shrink-0 bg-surface px-2 pb-1.5 pt-2">
+        {/*
+          三栏布局：左右各占 1fr、中间 auto。
+          这样「‹ 第 4 周 ›」**始终居中**，而右侧的工具按钮贴在最右边；
+          用 justify-between 做不到真正的居中（会被两侧宽度差带偏）。
+        */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+          {/* 左：占位，保持中栏绝对居中 */}
+          <div />
 
-          {/* 工具：翻周 / 加课 / 设置 */}
-          <div className="flex shrink-0 items-center gap-0.5">
+          {/* 中：上一周 / 第 N 周 / 下一周 */}
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
               aria-label="上一周"
@@ -310,6 +298,14 @@ export function TimetablePage() {
             </button>
             <button
               type="button"
+              className="min-w-[4.5rem] text-center text-[17px] font-semibold leading-tight"
+              title={week !== null ? '点一下回到本周' : '当前显示本周'}
+              onClick={() => setWeek(null)}
+            >
+              第 {viewWeek} 周
+            </button>
+            <button
+              type="button"
               aria-label="下一周"
               className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt disabled:opacity-30"
               disabled={viewWeek >= semester.totalWeeks}
@@ -317,6 +313,10 @@ export function TimetablePage() {
             >
               <ChevronRightIcon className="h-5 w-5" />
             </button>
+          </div>
+
+          {/* 右：加课 / 设置 */}
+          <div className="flex items-center justify-end gap-0.5">
             <button
               type="button"
               aria-label="添加课程"
@@ -334,6 +334,11 @@ export function TimetablePage() {
               <SettingsIcon className="h-5 w-5" />
             </button>
           </div>
+        </div>
+
+        {/* 统计：居中一行，信息密度高但不抢戏 */}
+        <div className="mb-1 text-center text-[11px] leading-tight text-muted">
+          {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 / {totalOccurrences} 次
         </div>
 
         {/* 星期与日期条：今天用主题色圆角块标出 */}
@@ -378,25 +383,29 @@ export function TimetablePage() {
       {/* ── 内容区：唯一可滚动的部分 ─────────────────────── */}
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {view === 'timetable' ? (
-          blocks.length === 0 ? (
-            <div className="p-3">
-              <EmptyState onLoadDemo={handleLoadDemo} onAdd={() => setSheetOpen(true)} />
-            </div>
-          ) : (
-            <TimetableGrid
-              rows={buildRows(periods)}
-              columns={buildColumns(semester, viewWeek, todayStr)}
-              blocks={gridBlocks}
-              onCellClick={(weekday, periodIndex) => {
-                setForm(emptyCourseForm(weekday, periodIndex))
-                setSheetOpen(true)
-              }}
-            />
-          )
+          <>
+            {blocks.length === 0 ? (
+              <div className="p-3">
+                <EmptyState onLoadDemo={handleLoadDemo} onAdd={() => setSheetOpen(true)} />
+              </div>
+            ) : (
+              <TimetableGrid
+                rows={buildRows(periods)}
+                columns={buildColumns(semester, viewWeek, todayStr)}
+                blocks={gridBlocks}
+                onCellClick={(weekday, periodIndex) => {
+                  setForm(emptyCourseForm(weekday, periodIndex))
+                  setSheetOpen(true)
+                }}
+              />
+            )}
+            {/* 课程总览紧接在表格下方（与表格同处一个滚动区），不单独占页签 */}
+            {blocks.length > 0 ? (
+              <CourseList courses={blocks} onDelete={handleDelete} onLoadDemo={handleLoadDemo} />
+            ) : null}
+          </>
         ) : (
-          <div className="p-3">
-            <CourseList courses={blocks} onDelete={handleDelete} onLoadDemo={handleLoadDemo} />
-          </div>
+          <CalendarPlaceholder />
         )}
       </main>
 
@@ -409,7 +418,7 @@ export function TimetablePage() {
           {(
             [
               ['timetable', '课程表'],
-              ['courses', '课程总览'],
+              ['calendar', '日程'],
             ] as const
           ).map(([key, label]) => {
             const active = view === key
@@ -469,6 +478,24 @@ function EmptyState({ onLoadDemo, onAdd }: { onLoadDemo: () => void; onAdd: () =
           载入示例课表
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 日程页签的**占位**。
+ *
+ * 日程表排在 M4，这里先把入口与版式占住。之所以不留白屏而是给一段说明：
+ * 用户点到空白页会以为"坏了"，写清楚"还没做、什么时候做"才不误导。
+ */
+function CalendarPlaceholder() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
+      <p className="text-sm font-medium text-muted">日程表还没做</p>
+      <p className="max-w-xs text-[11px] leading-relaxed text-muted">
+        这一块留给日程表与重要事件提醒，排在 M4。
+        课程表本身已经预留了扩展位——日程和课程共用同一套时间模型，加进来不需要改动现有功能。
+      </p>
     </div>
   )
 }

@@ -19,13 +19,15 @@ interface UiState {
   setActiveModuleId: (id: string) => void
 
   /**
-   * 当前页签：课表 / 课程总览。
+   * 当前页签。
    *
    * 放在 store 而不是组件里，因为外壳的**底部导航**需要读写它 ——
    * 导航被锁在屏幕底部，与内容区不在同一棵组件树里。
+   *
+   * `calendar` 目前是**占位页签**：日程表排在 M4，先把入口留出来。
    */
-  view: 'timetable' | 'courses'
-  setView: (view: 'timetable' | 'courses') => void
+  view: 'timetable' | 'calendar'
+  setView: (view: 'timetable' | 'calendar') => void
 
   /** 当前正在查看的学期；null 表示"跟随活跃学期" */
   semester: Semester | null
