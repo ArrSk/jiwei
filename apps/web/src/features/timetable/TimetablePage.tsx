@@ -16,7 +16,14 @@ import {
   type Period,
   type Semester,
 } from '@jiwei/core'
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  SettingsIcon,
+  type TimeGridColumn,
+  type TimeGridRow,
+} from '@jiwei/ui'
 import { useJiwei } from '../../JiweiContext'
 import { useUiStore } from '../../store'
 import { buildDemoCourses } from '../../lib/demoCourses'
@@ -24,6 +31,7 @@ import { allWeeks } from '@jiwei/data'
 import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
+import { SettingsPage } from '../../shell/SettingsPage'
 
 /** 从确定性 Occurrence ID 里取回节次：`occ_<blockId>#<date>#<periodStart>` */
 function periodStartOf(occId: string): number {
@@ -48,15 +56,34 @@ export function buildRows(periods: Period[]): TimeGridRow[] {
     }))
 }
 
-/** 生成某一周的 7 个列头 */
+/** 某一周的日期范围，形如 `9/22-9/28` */
+export function weekRangeLabel(semester: Semester, week: number): string {
+  const from = dateForWeek(semester, week, 1).slice(5).replace('-', '/')
+  const to = dateForWeek(semester, week, 7).slice(5).replace('-', '/')
+  return `${from}-${to}`
+}
+
+/** 星期几的中文单字：`2026-09-28` → `一` */
+export function weekdayLabel(date: string): string {
+  const idx = weekdayOf(date) - 1
+  return WEEKDAY_LABELS[idx] ?? ''
+}
+
+/**
+ * 生成某一周的 7 个列头。
+ *
+ * 主标题只写**单个汉字**（一/二/…/日）而不是"周一"—— 手机上每列只有约 45px，
+ * 与示例一致；副标题是日期 `9/23`。
+ */
 export function buildColumns(semester: Semester, week: number, todayStr: string): TimeGridColumn[] {
   return Array.from({ length: 7 }, (_, i) => {
     const weekday = i + 1
     const date = dateForWeek(semester, week, weekday)
+    const [, month, day] = date.split('-')
     return {
       weekday,
-      title: `周${WEEKDAY_LABELS[i]}`,
-      sub: date.slice(5),
+      title: WEEKDAY_LABELS[i] ?? '',
+      sub: `${Number(month)}/${Number(day)}`,
       isToday: date === todayStr,
     }
   })
@@ -95,7 +122,7 @@ export function parseWeeks(text: string, totalWeeks: number): number[] {
 
 export function TimetablePage() {
   const { repos, refresh, dataVersion } = useJiwei()
-  const { semester, setSemester, week, setWeek, toast } = useUiStore()
+  const { semester, setSemester, week, setWeek, toast, view, setView } = useUiStore()
 
   const [blocks, setBlocks] = useState<Block[]>([])
   const [occurrences, setOccurrences] = useState<Occurrence[]>([])
@@ -103,6 +130,7 @@ export function TimetablePage() {
   const [loading, setLoading] = useState(true)
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [form, setForm] = useState<CourseFormValue>(() => emptyCourseForm())
 
   // ── 读取数据（dataVersion 变化即重新查询）──────────────────
@@ -233,94 +261,174 @@ export function TimetablePage() {
     return <div className="p-6 text-sm text-muted">还没有学期数据，请重新打开应用以完成初始化。</div>
   }
 
-  const activeCount = occurrences.filter((o) => o.status !== 'cancelled').length
-
   return (
-    <div className="mx-auto max-w-6xl px-3 pb-28 pt-3 sm:px-4">
-      {/*
-        周次标题 + 左右切换 + 统计：**整体居中**（PC 与手机一致）。
-        用纵向排列而不是 justify-between —— 后者会把统计挤到最右侧，
-        视觉上并不居中，之前就是这样被反馈的。
-      */}
-      <div className="mb-3 flex flex-col items-center gap-2">
-        <div className="flex items-center gap-2">
+    /*
+      整页骨架（对齐参考示例）：
+        顶部控制栏（固定）
+        星期/日期条（固定）
+        内容区 ← **唯一可滚动的部分**（课表 / 课程总览）
+        底部页签（固定、始终可见）
+      用 h-full + flex 而不是让整页滚动 —— 这样底部页签才会**锁定**在屏幕底部。
+    */
+    <div className="flex h-full flex-col bg-canvas">
+      {/* ── 顶部：第一行标题，第二行工具 ─────────────────── */}
+      <header className="shrink-0 bg-surface px-3 pb-1.5 pt-2">
+        <div className="flex items-start justify-between gap-2">
+          {/* 周次：点一下回到本周 */}
           <button
             type="button"
-            aria-label="上一周"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
-            disabled={viewWeek <= 1}
-            onClick={() => setWeek(viewWeek - 1)}
+            className="min-w-0 text-left"
+            title={week !== null ? '点一下回到本周' : '当前显示本周'}
+            onClick={() => setWeek(null)}
           >
-            <ChevronLeftIcon className="h-4 w-4" />
-          </button>
-
-          <div className="min-w-[8.5rem] text-center">
-            <div className="text-sm font-semibold">
-              第 {viewWeek} 周
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[17px] font-semibold leading-tight">
+                第 {viewWeek} 周
+              </span>
+              <span className="text-[13px] leading-tight text-muted">
+                {weekdayLabel(dateForWeek(semester, viewWeek, 1))}
+              </span>
               {viewWeek === currentWeek ? (
-                <span className="ml-1 rounded bg-brand-soft px-1 py-0.5 text-[10px] text-brand">
-                  本周
-                </span>
+                <span className="rounded bg-brand-soft px-1 py-px text-[10px] text-brand">本周</span>
               ) : null}
             </div>
-            <div className="text-[11px] text-muted">
-              {dateForWeek(semester, viewWeek, 1).slice(5)} ~{' '}
-              {dateForWeek(semester, viewWeek, 7).slice(5)}
+            <div className="text-[12px] leading-tight text-muted">
+              {dateForWeek(semester, viewWeek, 1).replace(/-/g, '/')}
             </div>
-          </div>
-
-          <button
-            type="button"
-            aria-label="下一周"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-alt disabled:opacity-40"
-            disabled={viewWeek >= semester.totalWeeks}
-            onClick={() => setWeek(viewWeek + 1)}
-          >
-            <ChevronRightIcon className="h-4 w-4" />
           </button>
 
-          {week !== null ? (
+          {/* 工具：翻周 / 加课 / 设置 */}
+          <div className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
-              className="rounded-lg border border-border bg-surface px-2 py-1.5 text-xs hover:bg-surface-alt"
-              onClick={() => setWeek(null)}
+              aria-label="上一周"
+              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt disabled:opacity-30"
+              disabled={viewWeek <= 1}
+              onClick={() => setWeek(viewWeek - 1)}
             >
-              回到本周
+              <ChevronLeftIcon className="h-5 w-5" />
             </button>
-          ) : null}
+            <button
+              type="button"
+              aria-label="下一周"
+              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt disabled:opacity-30"
+              disabled={viewWeek >= semester.totalWeeks}
+              onClick={() => setWeek(viewWeek + 1)}
+            >
+              <ChevronRightIcon className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              aria-label="添加课程"
+              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
+              onClick={() => setSheetOpen(true)}
+            >
+              <PlusIcon className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              aria-label="设置"
+              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <SettingsIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        <div className="text-center text-[11px] text-muted">
-          {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 / {activeCount} 次
+        {/* 星期与日期条：今天用主题色圆角块标出 */}
+        <div className="mt-0.5 grid grid-cols-[2.6rem_repeat(7,1fr)] gap-x-1">
+          <div className="flex flex-col items-center justify-center pb-1">
+            <span className="text-[15px] font-semibold leading-tight">
+              {Number(dateForWeek(semester, viewWeek, 1).slice(5, 7))}
+            </span>
+            <span className="text-[11px] leading-tight text-muted">月</span>
+          </div>
+          {Array.from({ length: 7 }, (_, i) => {
+            const weekday = i + 1
+            const date = dateForWeek(semester, viewWeek, weekday)
+            const isToday = date === todayStr
+            return (
+              <button
+                key={date}
+                type="button"
+                className={
+                  'flex flex-col items-center justify-center rounded-lg py-1 leading-tight transition-colors ' +
+                  (isToday ? 'bg-brand text-white' : 'text-muted hover:bg-surface-alt')
+                }
+                title={`${date}（点按查看这一周的课表）`}
+                onClick={() => setSheetOpen(false)}
+              >
+                <span
+                  className={
+                    'text-[14px] leading-tight ' + (isToday ? 'font-semibold' : 'text-ink')
+                  }
+                >
+                  {WEEKDAY_LABELS[i]}
+                </span>
+                <span className="text-[11px] leading-tight">
+                  {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}
+                </span>
+              </button>
+            )
+          })}
         </div>
-      </div>
+      </header>
 
-      {blocks.length === 0 ? (
-        <EmptyState onLoadDemo={handleLoadDemo} onAdd={() => setSheetOpen(true)} />
-      ) : (
-        <TimetableGrid
-          rows={buildRows(periods)}
-          columns={buildColumns(semester, viewWeek, todayStr)}
-          blocks={gridBlocks}
-          onCellClick={(weekday, periodIndex) => {
-            setForm(emptyCourseForm(weekday, periodIndex))
-            setSheetOpen(true)
-          }}
-        />
-      )}
+      {/* ── 内容区：唯一可滚动的部分 ─────────────────────── */}
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {view === 'timetable' ? (
+          blocks.length === 0 ? (
+            <div className="p-3">
+              <EmptyState onLoadDemo={handleLoadDemo} onAdd={() => setSheetOpen(true)} />
+            </div>
+          ) : (
+            <TimetableGrid
+              rows={buildRows(periods)}
+              columns={buildColumns(semester, viewWeek, todayStr)}
+              blocks={gridBlocks}
+              onCellClick={(weekday, periodIndex) => {
+                setForm(emptyCourseForm(weekday, periodIndex))
+                setSheetOpen(true)
+              }}
+            />
+          )
+        ) : (
+          <div className="p-3">
+            <CourseList courses={blocks} onDelete={handleDelete} onLoadDemo={handleLoadDemo} />
+          </div>
+        )}
+      </main>
 
-      {blocks.length > 0 ? (
-        <CourseList courses={blocks} onDelete={handleDelete} onLoadDemo={handleLoadDemo} />
-      ) : null}
-
-      <button
-        type="button"
-        className="fixed bottom-6 right-5 z-40 flex items-center gap-1.5 rounded-full bg-brand px-4 py-3 text-sm font-medium text-white shadow-lg active:scale-95"
-        onClick={() => setSheetOpen(true)}
+      {/* ── 底部页签：锁定，始终可见 ─────────────────────── */}
+      <nav
+        className="shrink-0 border-t border-border bg-surface"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <PlusIcon className="h-4 w-4" />
-        添加课程
-      </button>
+        <div className="mx-auto flex max-w-2xl">
+          {(
+            [
+              ['timetable', '课程表'],
+              ['courses', '课程总览'],
+            ] as const
+          ).map(([key, label]) => {
+            const active = view === key
+            return (
+              <button
+                key={key}
+                type="button"
+                className={
+                  'min-h-[52px] flex-1 text-[13px] transition-colors ' +
+                  (active ? 'font-semibold text-brand' : 'text-muted')
+                }
+                onClick={() => setView(key)}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </nav>
 
       {sheetOpen ? (
         <CourseForm
@@ -332,6 +440,8 @@ export function TimetablePage() {
           totalWeeks={semester.totalWeeks}
         />
       ) : null}
+
+      {settingsOpen ? <SettingsPage onClose={() => setSettingsOpen(false)} /> : null}
     </div>
   )
 }

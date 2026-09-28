@@ -76,7 +76,8 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
   )
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+    // 不加边框、不加圆角：表格要**通栏铺满**整个内容区（对齐参考示例）
+    <div className="bg-surface">
       <TimeGrid rows={rows} columns={columns} blocks={gridBlocks} onCellClick={onCellClick} />
     </div>
   )

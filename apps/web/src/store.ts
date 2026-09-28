@@ -18,6 +18,15 @@ interface UiState {
   activeModuleId: string
   setActiveModuleId: (id: string) => void
 
+  /**
+   * 当前页签：课表 / 课程总览。
+   *
+   * 放在 store 而不是组件里，因为外壳的**底部导航**需要读写它 ——
+   * 导航被锁在屏幕底部，与内容区不在同一棵组件树里。
+   */
+  view: 'timetable' | 'courses'
+  setView: (view: 'timetable' | 'courses') => void
+
   /** 当前正在查看的学期；null 表示"跟随活跃学期" */
   semester: Semester | null
   setSemester: (semester: Semester | null) => void
@@ -37,6 +46,9 @@ interface UiState {
 export const useUiStore = create<UiState>((set) => ({
   activeModuleId: 'timetable',
   setActiveModuleId: (id) => set({ activeModuleId: id }),
+
+  view: 'timetable',
+  setView: (view) => set({ view }),
 
   semester: null,
   setSemester: (semester) => set({ semester, week: null }),

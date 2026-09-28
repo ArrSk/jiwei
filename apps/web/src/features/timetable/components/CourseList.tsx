@@ -35,7 +35,7 @@ export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
         </button>
       </div>
 
-      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border bg-surface">
         {sorted.map((course) => {
           const anchor = course.anchor
           const when =
