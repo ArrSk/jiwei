@@ -56,19 +56,6 @@ export function buildRows(periods: Period[]): TimeGridRow[] {
     }))
 }
 
-/** 某一周的日期范围，形如 `9/22-9/28` */
-export function weekRangeLabel(semester: Semester, week: number): string {
-  const from = dateForWeek(semester, week, 1).slice(5).replace('-', '/')
-  const to = dateForWeek(semester, week, 7).slice(5).replace('-', '/')
-  return `${from}-${to}`
-}
-
-/** 星期几的中文单字：`2026-09-28` → `一` */
-export function weekdayLabel(date: string): string {
-  const idx = weekdayOf(date) - 1
-  return WEEKDAY_LABELS[idx] ?? ''
-}
-
 /**
  * 生成某一周的 7 个列头。
  *
