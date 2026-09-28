@@ -1,7 +1,7 @@
 /** 课程清单：核对与删除。M1 会升级成"表格批量编辑"。 */
 import { useState } from 'react'
 import { WEEKDAY_LABELS, type Block } from '@jiwei/core'
-import { TrashIcon } from '@jiwei/ui'
+import { ChevronLeftIcon, TrashIcon } from '@jiwei/ui'
 import { paletteForBlock } from '../../../lib/palette'
 
 interface Props {
@@ -12,6 +12,13 @@ interface Props {
 
 export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null)
+  /**
+   * 默认收起。
+   *
+   * 为什么：课程总览排在 12 节课的表格**下方**，一学期常有上百次课，
+   * 展开着会让人以为"页面就到表格为止"。收起成一行标题，需要时点开。
+   */
+  const [open, setOpen] = useState(false)
 
   const sorted = [...courses].sort((a, b) => {
     const wa = a.anchor.type === 'curriculum' ? a.anchor.weekday : 9
@@ -23,61 +30,78 @@ export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
   })
 
   return (
-    <section className="mt-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">全部课程（{courses.length}）</h2>
+    <section className="border-t border-border bg-surface">
+      {/* 标题行：整行可点，用于展开/收起 */}
+      <div className="flex items-center justify-between px-3 py-2.5">
         <button
           type="button"
-          className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-alt"
-          onClick={() => void onLoadDemo()}
+          className="flex items-center gap-1.5 text-sm font-semibold"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
         >
-          再载入一次示例
+          <ChevronLeftIcon
+            className={
+              'h-4 w-4 text-muted transition-transform ' + (open ? '-rotate-90' : 'rotate-180')
+            }
+          />
+          全部课程（{courses.length}）
         </button>
+        {open ? (
+          <button
+            type="button"
+            className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-alt"
+            onClick={() => void onLoadDemo()}
+          >
+            再载入一次示例
+          </button>
+        ) : null}
       </div>
 
-      <ul className="divide-y divide-border bg-surface">
-        {sorted.map((course) => {
-          const anchor = course.anchor
-          const when =
-            anchor.type === 'curriculum'
-              ? `周${WEEKDAY_LABELS[anchor.weekday - 1]} 第 ${anchor.periods[0]}-${anchor.periods[1]} 节`
-              : anchor.type === 'absolute'
-                ? anchor.start.slice(0, 16).replace('T', ' ')
-                : anchor.date
-          const weeks =
-            anchor.type === 'curriculum' ? summarizeWeeks(anchor.weeks) : '单次'
+      {open ? (
+        <ul className="divide-y divide-border">
+          {sorted.map((course) => {
+            const anchor = course.anchor
+            const when =
+              anchor.type === 'curriculum'
+                ? `周${WEEKDAY_LABELS[anchor.weekday - 1]} 第 ${anchor.periods[0]}-${anchor.periods[1]} 节`
+                : anchor.type === 'absolute'
+                  ? anchor.start.slice(0, 16).replace('T', ' ')
+                  : anchor.date
+            const weeks =
+              anchor.type === 'curriculum' ? summarizeWeeks(anchor.weeks) : '单次'
 
-          return (
-            <li key={course.id} className="flex items-center gap-3 px-3 py-2">
-              {/* 用课程自己的配色做色条，与课表网格保持一致 */}
-              <span
-                className="h-8 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: paletteForBlock(course).text }}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{course.title}</div>
-                <div className="truncate text-[11px] text-muted">
-                  {when} · {weeks}
-                  {course.detail?.teacher ? ` · ${course.detail.teacher}` : ''}
-                  {course.detail?.location ? ` · ${course.detail.location}` : ''}
+            return (
+              <li key={course.id} className="flex items-center gap-3 px-3 py-2">
+                {/* 用课程自己的配色做色条，与课表网格保持一致 */}
+                <span
+                  className="h-8 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: paletteForBlock(course).text }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{course.title}</div>
+                  <div className="truncate text-[11px] text-muted">
+                    {when} · {weeks}
+                    {course.detail?.teacher ? ` · ${course.detail.teacher}` : ''}
+                    {course.detail?.location ? ` · ${course.detail.location}` : ''}
+                  </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                aria-label={`删除 ${course.title}`}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-alt hover:text-danger"
-                disabled={pendingId === course.id}
-                onClick={() => {
-                  setPendingId(course.id)
-                  void onDelete(course).finally(() => setPendingId(null))
-                }}
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+                <button
+                  type="button"
+                  aria-label={`删除 ${course.title}`}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-alt hover:text-danger"
+                  disabled={pendingId === course.id}
+                  onClick={() => {
+                    setPendingId(course.id)
+                    void onDelete(course).finally(() => setPendingId(null))
+                  }}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
     </section>
   )
 }
