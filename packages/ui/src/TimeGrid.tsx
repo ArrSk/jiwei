@@ -63,6 +63,13 @@ export interface TimeGridProps {
   onCellClick?: (weekday: number, periodIndex: number) => void
   /** 行高，默认用 CSS clamp 自适应；传入则固定 */
   rowHeight?: number
+  /**
+   * 左上角格子的内容（那一列是节次轴）。
+   * 课表在这里放「月份」，于是整条表头与网格天然对齐。
+   */
+  corner?: ReactNode
+  /** 是否在顶部显示星期/日期表头（默认显示） */
+  showHeader?: boolean
   className?: string
 }
 
@@ -72,16 +79,21 @@ export function TimeGrid({
   blocks,
   onCellClick,
   rowHeight,
+  corner,
+  showHeader = true,
   className,
 }: TimeGridProps) {
-  const { layoutRows, rowOf, headerRow, firstBodyGridRow, bodyGridRowCount } = buildRows(rows)
+  const { layoutRows, rowOf, bodyGridRowCount } = buildRows(rows)
+
+  /** 表头占一行（显示时）；正文行号相应后移 */
+  const bodyOffset = showHeader ? 1 : 0
 
   const gridStyle: CSSProperties = {
     // 轴列随屏宽收缩：手机 2.25rem，桌面 3.5rem
     gridTemplateColumns: 'var(--tg-axis) repeat(7, minmax(0, 1fr))',
-    gridTemplateRows: rowHeight
-      ? `auto repeat(${bodyGridRowCount}, ${rowHeight}px)`
-      : 'auto repeat(var(--tg-rows), var(--tg-row-h))',
+    gridTemplateRows: `${showHeader ? 'auto ' : ''}${
+      rowHeight ? `repeat(${bodyGridRowCount}, ${rowHeight}px)` : 'repeat(var(--tg-rows), var(--tg-row-h))'
+    }`,
   }
 
   return (
@@ -98,55 +110,60 @@ export function TimeGrid({
       }
     >
       <div className="grid" style={gridStyle}>
-        {/* 表头：左上角空格 + 7 个列头。
-            注意 sticky + z-30 是**必须的**：课程块是 z-10，表头若没有定位与 z-index，
-            跨节的大色块会直接盖住表头（初版就出现过这个 bug）。 */}
-        <div
-          className="sticky top-0 z-30 bg-surface-alt"
-          style={{ gridColumn: 1, gridRow: headerRow }}
-        />
-        {columns.map((col) => (
-          <div
-            key={`head-${col.weekday}`}
-            className="sticky top-0 z-30 flex items-center justify-center bg-surface-alt px-0.5 py-1"
-            style={{ gridColumn: col.weekday + 1, gridRow: headerRow }}
-          >
-            {/*
-              表头做成**一整块的圆角胶囊**：今日整块填主题色、文字变白。
-              这比"只给日期变色"醒目得多，也与你提供的示例一致。
-            */}
+        {/*
+          表头**由本组件渲染在网格的第一行**（而不是让宿主另外画一条）。
+          这样它天然与列对齐、也不可能重复；宿主要放的额外内容（月份）走 `corner`。
+          早期是宿主自己画表头，这里又画了一条 —— 通栏铺满后重复非常明显。
+        */}
+        {showHeader ? (
+          <>
             <div
-              className={clsx(
-                'flex w-full flex-col items-center justify-center rounded-lg py-0.5 leading-tight',
-                col.isToday ? 'bg-brand text-white' : '',
-              )}
+              className="sticky top-0 z-30 flex items-center justify-center bg-surface-alt"
+              style={{ gridColumn: 1, gridRow: 1 }}
             >
-              <span
-                className={clsx(
-                  'text-[15px] leading-tight',
-                  col.isToday ? 'font-semibold text-white' : 'font-semibold text-ink',
-                )}
+              {corner}
+            </div>
+            {columns.map((col) => (
+              <div
+                key={`head-${col.weekday}`}
+                className="sticky top-0 z-30 flex items-center justify-center bg-surface-alt px-0.5 py-1"
+                style={{ gridColumn: col.weekday + 1, gridRow: 1 }}
               >
-                {col.title}
-              </span>
-              {col.sub ? (
-                <span
+                {/* 今日整块填主题色 + 白字，比"只给日期上色"醒目得多 */}
+                <div
                   className={clsx(
-                    'text-[11px] leading-tight',
-                    col.isToday ? 'text-white/85' : 'text-muted',
+                    'flex w-full flex-col items-center justify-center rounded-lg py-0.5 leading-tight',
+                    col.isToday && 'bg-brand text-white',
                   )}
                 >
-                  {col.sub}
-                </span>
-              ) : null}
-            </div>
-          </div>
-        ))}
+                  <span
+                    className={clsx(
+                      'text-[15px] leading-tight font-semibold',
+                      col.isToday ? 'text-white' : 'text-ink',
+                    )}
+                  >
+                    {col.title}
+                  </span>
+                  {col.sub ? (
+                    <span
+                      className={clsx(
+                        'text-[11px] leading-tight',
+                        col.isToday ? 'text-white/85' : 'text-muted',
+                      )}
+                    >
+                      {col.sub}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </>
+        ) : null}
 
         {/* 行：左侧节次轴 + 7 天空白格。
             分割方式：**只有横向的淡线，没有竖线**（列与列靠留白区分，与示例一致）。 */}
         {layoutRows.map((row) => {
-          const gridRow = firstBodyGridRow + row.gridIndex
+          const gridRow = row.gridIndex + 1 + bodyOffset
           const [startTime, endTime] = row.sub?.split('-') ?? []
 
           return (
@@ -197,7 +214,7 @@ export function TimeGrid({
               className="min-w-0 p-[2px]"
               style={{
                 gridColumn: block.weekday + 1,
-                gridRow: `${firstBodyGridRow + startIdx} / ${firstBodyGridRow + endIdx + 1}`,
+                gridRow: `${startIdx + 1 + bodyOffset} / ${endIdx + 2 + bodyOffset}`,
                 zIndex: 10,
               }}
             >
@@ -233,25 +250,22 @@ interface LayoutRow {
   index: number
   label: string
   sub?: string
-  /** 在本网格里的行序号（0 起，从表头下方第一行算） */
+  /** 在本网格里的行序号（0 起） */
   gridIndex: number
 }
 
 interface Layout {
   layoutRows: LayoutRow[]
   bodyGridRowCount: number
-  headerRow: number
-  firstBodyGridRow: number
-  /** 节次 → 行序号（0 起，从表头下方算）；缺失返回 null */
+  /** 节次 → 行序号（0 起）；缺失返回 null */
   rowOf: (periodIndex: number) => number | null
 }
 
 /**
  * 把节次列表转成网格行序列。
  *
- * 返回的 `gridIndex` 是**表头下方**的行序号，实际 grid-row = gridIndex + 2
- * （第 1 行是表头，CSS 网格行号从 1 开始）。所有格子都用同一套计算，
- * 因此节次轴、空白格、时间块三者必然对齐。
+ * 没有表头行，所以 `gridIndex` 就是网格行号减一（CSS 网格行号从 1 开始）。
+ * 节次轴、空白格、时间块共用同一套计算，因此必然对齐。
  */
 function buildRows(rows: TimeGridRow[]): Layout {
   const layoutRows: LayoutRow[] = rows.map((row, i) => ({
@@ -267,8 +281,6 @@ function buildRows(rows: TimeGridRow[]): Layout {
   return {
     layoutRows,
     bodyGridRowCount: layoutRows.length,
-    headerRow: 1,
-    firstBodyGridRow: 2,
     rowOf: (periodIndex: number) => map.get(periodIndex) ?? null,
   }
 }

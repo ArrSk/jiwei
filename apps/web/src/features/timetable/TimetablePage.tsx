@@ -337,46 +337,8 @@ export function TimetablePage() {
         </div>
 
         {/* 统计：居中一行，信息密度高但不抢戏 */}
-        <div className="mb-1 text-center text-[11px] leading-tight text-muted">
+        <div className="mb-1.5 text-center text-[11px] leading-tight text-muted">
           {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 / {totalOccurrences} 次
-        </div>
-
-        {/* 星期与日期条：今天用主题色圆角块标出 */}
-        <div className="mt-0.5 grid grid-cols-[2.6rem_repeat(7,1fr)] gap-x-1">
-          <div className="flex flex-col items-center justify-center pb-1">
-            <span className="text-[15px] font-semibold leading-tight">
-              {Number(dateForWeek(semester, viewWeek, 1).slice(5, 7))}
-            </span>
-            <span className="text-[11px] leading-tight text-muted">月</span>
-          </div>
-          {Array.from({ length: 7 }, (_, i) => {
-            const weekday = i + 1
-            const date = dateForWeek(semester, viewWeek, weekday)
-            const isToday = date === todayStr
-            return (
-              <button
-                key={date}
-                type="button"
-                className={
-                  'flex flex-col items-center justify-center rounded-lg py-1 leading-tight transition-colors ' +
-                  (isToday ? 'bg-brand text-white' : 'text-muted hover:bg-surface-alt')
-                }
-                title={`${date}（点按查看这一周的课表）`}
-                onClick={() => setSheetOpen(false)}
-              >
-                <span
-                  className={
-                    'text-[14px] leading-tight ' + (isToday ? 'font-semibold' : 'text-ink')
-                  }
-                >
-                  {WEEKDAY_LABELS[i]}
-                </span>
-                <span className="text-[11px] leading-tight">
-                  {Number(date.slice(5, 7))}/{Number(date.slice(8, 10))}
-                </span>
-              </button>
-            )
-          })}
         </div>
       </header>
 
@@ -393,6 +355,15 @@ export function TimetablePage() {
                 rows={buildRows(periods)}
                 columns={buildColumns(semester, viewWeek, todayStr)}
                 blocks={gridBlocks}
+                /* 表头左上角（节次轴那一列）放月份，于是整条表头与网格天然对齐 */
+                corner={
+                  <div className="flex flex-col items-center justify-center leading-tight">
+                    <span className="text-[15px] font-semibold">
+                      {Number(dateForWeek(semester, viewWeek, 1).slice(5, 7))}
+                    </span>
+                    <span className="text-[11px] text-muted">月</span>
+                  </div>
+                }
                 onCellClick={(weekday, periodIndex) => {
                   setForm(emptyCourseForm(weekday, periodIndex))
                   setSheetOpen(true)

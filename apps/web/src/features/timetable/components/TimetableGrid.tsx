@@ -1,4 +1,5 @@
 /** 课表网格：把核心数据映射到通用的 `TimeGrid`（后者不认识"课"这个概念）。 */
+import type { ReactNode } from 'react'
 import type { Block, Occurrence } from '@jiwei/core'
 import { TimeGrid, type TimeGridBlock, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
 import { paletteForBlock } from '../../../lib/palette'
@@ -16,6 +17,8 @@ interface Props {
   columns: TimeGridColumn[]
   blocks: PositionedBlock[]
   onCellClick: (weekday: number, periodIndex: number) => void
+  /** 表头左上角格子的内容（课表在这里放月份） */
+  corner?: ReactNode
 }
 
 /**
@@ -37,7 +40,7 @@ export function formatWeeks(weeks: number[]): string {
   return `${sorted.join(',')}周`
 }
 
-export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
+export function TimetableGrid({ rows, columns, blocks, onCellClick, corner }: Props) {
   const gridBlocks: TimeGridBlock[] = blocks.map(
     ({ block, occ, weekday, periodStart, periodEnd }) => {
       // 一门课一种颜色：用户自选优先，否则按课程名稳定派生
@@ -54,11 +57,14 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
         muted: occ.status === 'cancelled',
         style: { backgroundColor: palette.bg, color: palette.text },
         // 版式对齐参考示例：
-        //   课程名加粗在上；下面依次是「@老师」「@教室」「周次」，小字、稍透明、**右对齐**。
+        //   课程名**居中**加粗在上；下面依次是「@老师」「@教室」「周次」，
+        //   小字、稍透明、**右对齐**（左中右的错落在窄列里反而更好读）。
         // 课程名**不加 truncate**：手机上要能完整显示，换行比截断重要。
         content: (
           <span className="flex h-full min-w-0 flex-col gap-[2px] overflow-hidden">
-            <span className="font-semibold [overflow-wrap:anywhere]">{block.title}</span>
+            <span className="text-center font-semibold [overflow-wrap:anywhere]">
+              {block.title}
+            </span>
             <span className="flex min-w-0 flex-col items-end text-right text-[10px] leading-[1.35] opacity-85">
               {block.detail?.teacher ? (
                 <span className="[overflow-wrap:anywhere]">@{block.detail.teacher}</span>
@@ -78,7 +84,13 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick }: Props) {
   return (
     // 不加边框、不加圆角：表格要**通栏铺满**整个内容区（对齐参考示例）
     <div className="bg-surface">
-      <TimeGrid rows={rows} columns={columns} blocks={gridBlocks} onCellClick={onCellClick} />
+      <TimeGrid
+        rows={rows}
+        columns={columns}
+        blocks={gridBlocks}
+        corner={corner}
+        onCellClick={onCellClick}
+      />
     </div>
   )
 }
