@@ -393,94 +393,111 @@ export function TimetablePage() {
   return (
     /*
       整页骨架（对齐参考示例）：
-        顶部控制栏（固定）
-        星期/日期条（固定）
-        内容区 ← **唯一可滚动的部分**（课表 / 课程总览）
+        顶部控制栏（固定，**仅课程表页签**）
+        星期/日期条（固定在网格里）
+        内容区 ← **唯一可滚动的部分**（课表 / 课程总览 / 日程）
         底部页签（固定、始终可见）
       用 h-full + flex 而不是让整页滚动 —— 这样底部页签才会**锁定**在屏幕底部。
     */
     <div className="flex h-full flex-col bg-canvas">
-      {/* ── 顶部控制栏 ───────────────────────────────────── */}
-      <header className="shrink-0 bg-surface px-2 pb-1.5 pt-2">
-        {/*
-          三栏布局：左右各占 1fr、中间 auto。
-          这样「‹ 第 4 周 ›」**始终居中**，而右侧的工具按钮贴在最右边；
-          用 justify-between 做不到真正的居中（会被两侧宽度差带偏）。
-        */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+      {/*
+        顶部控制栏只在「课程表」页签显示。
+        日程页签下「第 N 周 / 加课 / 设置」都没有意义 —— 日程是按真实日期走的，
+        与教学周无关；在日程页面上留着加课按钮，用户会以为加进去的是日程。
+        日程页签有自己的标题栏（见下方 header）。
+      */}
+      {view === 'calendar' ? (
+        /*
+          日程页签的标题栏：只有名字，没有任何与课表相关的控件。
+          日程按真实日期走，和教学周无关，所以这里不显示「第几周」，也不放加课按钮 ——
+          在日程页上留一个「＋」，用户会以为加进去的是日程事件。
+        */
+        <header className="shrink-0 border-b border-border bg-surface px-3 py-2.5">
+          <h1 className="text-center text-[15px] font-semibold">日程</h1>
+        </header>
+      ) : (
+        <header className="shrink-0 bg-surface px-2 pb-1.5 pt-2">
           {/*
-            左：当前课表的名字（点开管理面板）。
-            这块原来是空占位，用来让「第 N 周」绝对居中 —— 现在把课表名放这里：
-            多张课表并存时，用户需要一眼看出"我现在看的是哪一张"，也需要一个入口去切换。
+            三栏布局：左右各占 1fr、中间 auto。
+            这样「‹ 第 4 周 ›」**始终居中**，而右侧的工具按钮贴在最右边；
+            用 justify-between 做不到真正的居中（会被两侧宽度差带偏）。
           */}
-          <div className="flex min-w-0 items-center">
-            <button
-              type="button"
-              className="flex min-w-0 items-center gap-0.5 rounded-lg px-1.5 py-1 text-[12px] text-muted hover:bg-surface-alt"
-              title="管理我的课表"
-              onClick={() => setSemesterSheetOpen(true)}
-            >
-              <span className="truncate max-w-[5.5rem]">{semester.name}</span>
-              <span className="shrink-0 text-[9px]">▾</span>
-            </button>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+            {/*
+              左：当前课表的名字（点开管理面板）。
+              这块原来是空占位，用来让「第 N 周」绝对居中 —— 现在把课表名放这里：
+              多张课表并存时，用户需要一眼看出"我现在看的是哪一张"，也需要一个入口去切换。
+            */}
+            <div className="flex min-w-0 items-center">
+              <button
+                type="button"
+                className="flex min-w-0 items-center gap-0.5 rounded-lg px-1.5 py-1 text-[12px] text-muted hover:bg-surface-alt"
+                title="管理我的课表"
+                onClick={() => setSemesterSheetOpen(true)}
+              >
+                <span className="truncate max-w-[5.5rem]">{semester.name}</span>
+                <span className="shrink-0 text-[9px]">▾</span>
+              </button>
+            </div>
+
+            {/* 中：上一周 / 第 N 周 / 下一周 */}
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label="上一周"
+                className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt disabled:opacity-30"
+                disabled={viewWeek <= 1}
+                onClick={() => setWeek(viewWeek - 1)}
+              >
+                <ChevronLeftIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                className="min-w-[4.5rem] text-center text-[17px] font-semibold leading-tight"
+                title={week !== null ? '点一下回到本周' : '当前显示本周'}
+                onClick={() => setWeek(null)}
+              >
+                第 {viewWeek} 周
+              </button>
+              <button
+                type="button"
+                aria-label="下一周"
+                className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt disabled:opacity-30"
+                disabled={viewWeek >= semester.totalWeeks}
+                onClick={() => setWeek(viewWeek + 1)}
+              >
+                <ChevronRightIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* 右：加课 / 设置 */}
+            <div className="flex items-center justify-end gap-0.5">
+              <button
+                type="button"
+                aria-label="添加课程"
+                className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
+                onClick={() => setSheetOpen(true)}
+              >
+                <PlusIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                aria-label="设置"
+                className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <SettingsIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
-          {/* 中：上一周 / 第 N 周 / 下一周 */}
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              aria-label="上一周"
-              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt disabled:opacity-30"
-              disabled={viewWeek <= 1}
-              onClick={() => setWeek(viewWeek - 1)}
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              className="min-w-[4.5rem] text-center text-[17px] font-semibold leading-tight"
-              title={week !== null ? '点一下回到本周' : '当前显示本周'}
-              onClick={() => setWeek(null)}
-            >
-              第 {viewWeek} 周
-            </button>
-            <button
-              type="button"
-              aria-label="下一周"
-              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt disabled:opacity-30"
-              disabled={viewWeek >= semester.totalWeeks}
-              onClick={() => setWeek(viewWeek + 1)}
-            >
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
+          {/* 统计：居中一行，信息密度高但不抢戏 */}
+          <div className="mb-1.5 text-center text-[11px] leading-tight text-muted">
+            {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 /{' '}
+            {totalOccurrences} 次
           </div>
-
-          {/* 右：加课 / 设置 */}
-          <div className="flex items-center justify-end gap-0.5">
-            <button
-              type="button"
-              aria-label="添加课程"
-              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
-              onClick={() => setSheetOpen(true)}
-            >
-              <PlusIcon className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              aria-label="设置"
-              className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <SettingsIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* 统计：居中一行，信息密度高但不抢戏 */}
-        <div className="mb-1.5 text-center text-[11px] leading-tight text-muted">
-          {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 / {totalOccurrences} 次
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* ── 内容区：唯一可滚动的部分 ─────────────────────── */}
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
