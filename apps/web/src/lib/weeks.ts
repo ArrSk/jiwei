@@ -48,6 +48,47 @@ export function weeksToFormText(weeks: number[]): string {
 }
 
 /**
+ * 把用户输入的周次文本解析成周次数组。
+ *
+ * 支持的写法（三种可以混用，用逗号分隔）：
+ * - `1-16`      连续范围
+ * - `1-16单`    只留奇数周（也认 `单周`）
+ * - `1,3,5,7`   逐个列举
+ *
+ * **跳过周次靠列举实现**（例如 `1-16` 里不想上第 5、6 周就写 `1-4,7-16`）：
+ * 没有专门的"减掉某几周"界面，但语义上够用，且这个文本格式是用户可见、可复制的。
+ *
+ * 放在 lib 而不是页面组件里：课表表单与批量编辑都要用它，
+ * 留在页面里会形成"组件 import 组件"的循环依赖。
+ */
+export function parseWeeks(text: string, totalWeeks: number): number[] {
+  const raw = text.trim()
+  if (!raw) return []
+  const oddOnly = raw.includes('单')
+  const evenOnly = raw.includes('双')
+  const cleaned = raw.replace(/[单双周\s]/g, '')
+  const weeks = new Set<number>()
+
+  for (const part of cleaned.split(/[,，]/)) {
+    if (!part) continue
+    const range = part.match(/^(\d+)\s*[-~]\s*(\d+)$/)
+    if (range) {
+      const from = Number(range[1])
+      const to = Number(range[2])
+      for (let w = Math.min(from, to); w <= Math.max(from, to); w += 1) weeks.add(w)
+      continue
+    }
+    if (/^\d+$/.test(part)) weeks.add(Number(part))
+  }
+
+  return [...weeks]
+    .filter((w) => w >= 1 && w <= totalWeeks)
+    .filter((w) => (oddOnly ? w % 2 === 1 : true))
+    .filter((w) => (evenOnly ? w % 2 === 0 : true))
+    .sort((a, b) => a - b)
+}
+
+/**
  * 从确定性场次 id 里取回起始节次。
  *
  * id 形如 `occ_<blockId>#<date>#<periodStart>`（见 `@jiwei/core` 的 occurrenceId）。

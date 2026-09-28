@@ -147,8 +147,15 @@ function makeOccurrence(
 
 /**
  * 展开一批 Block，并套用调课/停课（`Adjustment`）。
- * - `cancel`：该次标记 `status='cancelled'`（仍保留记录，界面上灰掉而不是消失）
- * - `move`  ：该次标记 `status='moved'`，并在新日期补一条（ID 按新日期派生，保持确定性）
+ *
+ * 三种调整的语义（这三条是**界面上必须看到的差别**，不能含糊）：
+ * - `cancel`：原时间那一次标记 `cancelled` —— 界面灰掉划线，提示"停课"
+ * - `move`  ：原时间那一次标记 `moved`（这里已经没课了），并在新日期补一条 `normal`，
+ *             带上 `movedFrom` 记录原日期 —— 界面在新日期标"调课"
+ * - `add`   ：只在 `newDate` 补一条 `normal`（补课），原时间不动
+ *
+ * ⚠️ 曾经的错误：`moved` 被标记在**新日期**那一条上，原时间保持 `normal`，
+ * 于是同一次课在原时间与新时间各显示一遍。判据就在下面的测试里。
  */
 export function materializeAll(
   blocks: Block[],
@@ -174,13 +181,20 @@ function applyAdjustments(
 ): Occurrence[] {
   if (adjustments.length === 0) return occurrences
 
-  const cancels = new Set(
-    adjustments.filter((a) => a.action === 'cancel').map((a) => a.date),
+  const cancels = new Set(adjustments.filter((a) => a.action === 'cancel').map((a) => a.date))
+  const movesAway = new Set(
+    adjustments
+      .filter((a) => a.action === 'move' && a.newDate)
+      .map((a) => a.date),
   )
+
   const result: Occurrence[] = []
   for (const occ of occurrences) {
     if (cancels.has(occ.date)) {
       result.push({ ...occ, status: 'cancelled' })
+    } else if (movesAway.has(occ.date)) {
+      // 原时间不再上课：保留记录并标记，界面上灰掉，用户可据此撤销
+      result.push({ ...occ, status: 'moved' })
     } else {
       result.push(occ)
     }
@@ -200,7 +214,9 @@ function applyAdjustments(
       date: adj.newDate,
       start: r.start,
       end: r.end,
-      status: adj.action === 'move' ? 'moved' : 'normal',
+      status: 'normal',
+      // 调过来的那一次要留下"从哪来"的痕迹，否则新位置上看起来和普通课一样
+      ...(adj.action === 'move' ? { movedFrom: adj.date } : {}),
     })
   }
   void deps

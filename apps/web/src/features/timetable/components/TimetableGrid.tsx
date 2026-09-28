@@ -48,10 +48,11 @@ export function TimetableGrid({
         weekday,
         periodStart,
         periodEnd,
-        muted: occ.status === 'cancelled',
+        // 停课、以及"被调走"的那一次都置灰：它们在原时间上都不上课了
+        muted: occ.status === 'cancelled' || occ.status === 'moved',
         style: { backgroundColor: palette.bg, color: palette.text },
-        // 点课程块 → 进入编辑（M1）。停课的场次不给点，避免误改模板。
-        ...(onBlockClick && occ.status !== 'cancelled'
+        // 点课程块 → 进入编辑（M1）。已经不上课的那两次不给点，避免误改模板。
+        ...(onBlockClick && occ.status === 'normal'
           ? { onClick: () => onBlockClick(block) }
           : {}),
         // 版式对齐参考示例：
@@ -71,7 +72,9 @@ export function TimetableGrid({
                 <span className="[overflow-wrap:anywhere]">@{block.detail.location}</span>
               ) : null}
               {weeksLabel ? <span>{weeksLabel}</span> : null}
-              {occ.status === 'moved' ? <span>调课</span> : null}
+              {/* 「调课」标在**新时间**那一条上；原时间那一条标「已调走」 */}
+              {occ.movedFrom ? <span>调课</span> : null}
+              {occ.status === 'moved' ? <span>已调走</span> : null}
             </span>
           </span>
         ),

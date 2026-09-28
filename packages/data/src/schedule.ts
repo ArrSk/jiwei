@@ -4,27 +4,52 @@
  * 作息表（`Period[]`）是**生成结果**，本配置是**生成配方**。
  * 两者都要存：前者用于渲染与时间展开，后者用于用户回到设置页时看到当前参数、
  * 并在修改后重建整张作息表。
+ *
+ * **配置按学期分开存**（`scheduleConfig:<semesterId>`）：
+ * 一个人可能同时有"本科课表"和"辅修课表"，两边的上课时间不一定一样。
+ * 早期版本把配置存在全局键 `scheduleConfig` 上，于是改 A 课表的作息会让
+ * B 课表的设置页显示成 A 的参数 —— 读的时候会回退到那个旧键，老数据不受影响。
  */
 import { defaultScheduleConfig, ScheduleConfig } from '@jiwei/core'
 import type { Repos } from './types'
 
-const META_KEY = 'scheduleConfig'
+/** 旧版本的全局键，只读不写（兼容升级前建的库） */
+const LEGACY_META_KEY = 'scheduleConfig'
 
-/** 读取作息配置；没有则返回默认参数（兼容本功能上线前创建的数据库） */
-export async function loadScheduleConfig(repos: Repos): Promise<ScheduleConfig> {
-  const raw = await repos.meta.get(META_KEY)
-  if (!raw) return defaultScheduleConfig()
-  try {
-    const parsed = ScheduleConfig.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data : defaultScheduleConfig()
-  } catch {
-    return defaultScheduleConfig()
-  }
+function metaKey(semesterId: string): string {
+  return `scheduleConfig:${semesterId}`
 }
 
-export async function saveScheduleConfig(repos: Repos, config: ScheduleConfig): Promise<void> {
+/**
+ * 读取某个学期的作息配置。
+ * 找不到就回退到旧全局键，再找不到返回默认参数。
+ */
+export async function loadScheduleConfig(
+  repos: Repos,
+  semesterId?: string,
+): Promise<ScheduleConfig> {
+  const keys = semesterId ? [metaKey(semesterId), LEGACY_META_KEY] : [LEGACY_META_KEY]
+  for (const key of keys) {
+    const raw = await repos.meta.get(key)
+    if (!raw) continue
+    try {
+      const parsed = ScheduleConfig.safeParse(JSON.parse(raw))
+      if (parsed.success) return parsed.data
+    } catch {
+      // 坏数据当没有，继续回退
+    }
+  }
+  return defaultScheduleConfig()
+}
+
+/** 保存某个学期的作息配置 */
+export async function saveScheduleConfig(
+  repos: Repos,
+  semesterId: string,
+  config: ScheduleConfig,
+): Promise<void> {
   const validated = ScheduleConfig.parse(config)
-  await repos.meta.set(META_KEY, JSON.stringify(validated))
+  await repos.meta.set(metaKey(semesterId), JSON.stringify(validated))
 }
 
 /**
@@ -55,7 +80,7 @@ export async function applyScheduleConfig(
 
   await repos.periods.replaceAll(semesterId, periods)
   const persisted = await repos.periods.listBySemester(semesterId)
-  await saveScheduleConfig(repos, buildScheduleConfigFromPeriods(persisted, validated))
+  await saveScheduleConfig(repos, semesterId, buildScheduleConfigFromPeriods(persisted, validated))
   await repos.rebuildOccurrences(semesterId)
   return periods.length
 }

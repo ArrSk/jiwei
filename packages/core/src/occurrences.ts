@@ -5,14 +5,26 @@
 import { Occurrence } from './schema'
 import { compareOccurrence } from './materialize'
 
-/** 日期区间筛选（含首尾），已过滤取消的场次 */
+/**
+ * 这一次课是否**真的会上**。
+ *
+ * `cancelled`（停课）与原时间上的 `moved`（被调走了）都不算 ——
+ * 它们只是留在界面上让用户看见"这里原本有课、现在没了"。
+ * 判断"下一节是哪节""有没有冲突""今天有几节课"时都必须用这个函数，
+ * 否则会把已经取消的课算进去（例如停课后仍提示"下一节：高等数学"）。
+ */
+export function isOccurrenceActive(occ: Occurrence): boolean {
+  return occ.status !== 'cancelled' && occ.status !== 'moved'
+}
+
+/** 日期区间筛选（含首尾），已排除停课与被调走的场次 */
 export function occurrencesInRange(
   occurrences: Occurrence[],
   fromDate: string,
   toDate: string,
 ): Occurrence[] {
   return occurrences
-    .filter((o) => o.status !== 'cancelled' && o.date >= fromDate && o.date <= toDate)
+    .filter((o) => isOccurrenceActive(o) && o.date >= fromDate && o.date <= toDate)
     .sort(compareOccurrence)
 }
 
@@ -22,13 +34,23 @@ export function occurrencesOnDate(occurrences: Occurrence[], date: string): Occu
 }
 
 /**
+ * 某一天的**全部**场次，**包含已停课与被调走的**。
+ *
+ * 日视图要用这个：停课/调课的那一次必须仍然显示（灰掉 + 划线 + 标注），
+ * 否则用户看不到自己做过什么调整，也就没法把它恢复回来。
+ */
+export function allOccurrencesOnDate(occurrences: Occurrence[], date: string): Occurrence[] {
+  return occurrences.filter((o) => o.date === date).sort(compareOccurrence)
+}
+
+/**
  * 下一场（严格在当前时刻之后）。
  * @param nowIso 当前时刻，格式与 `Occurrence.start` 一致（`YYYY-MM-DDTHH:mm:ss+08:00`）；
  *               字符串比较即可，因为本项目统一用同一时区偏移。
  */
 export function nextOccurrence(occurrences: Occurrence[], nowIso: string): Occurrence | null {
   const upcoming = occurrences
-    .filter((o) => o.status !== 'cancelled' && o.end > nowIso)
+    .filter((o) => isOccurrenceActive(o) && o.end > nowIso)
     .sort(compareOccurrence)
   return upcoming[0] ?? null
 }
@@ -38,7 +60,7 @@ export function ongoingOccurrences(
   occurrences: Occurrence[],
   nowIso: string,
 ): Occurrence[] {
-  return occurrences.filter((o) => o.status !== 'cancelled' && o.start <= nowIso && o.end > nowIso)
+  return occurrences.filter((o) => isOccurrenceActive(o) && o.start <= nowIso && o.end > nowIso)
 }
 
 /** 两个 ISO 时刻是否重叠（半开区间 [start, end)） */
@@ -59,7 +81,7 @@ export interface Conflict {
 export function detectConflicts(occurrences: Occurrence[]): Conflict[] {
   const byDate = new Map<string, Occurrence[]>()
   for (const o of occurrences) {
-    if (o.status === 'cancelled') continue
+    if (!isOccurrenceActive(o)) continue
     const list = byDate.get(o.date) ?? []
     list.push(o)
     byDate.set(o.date, list)

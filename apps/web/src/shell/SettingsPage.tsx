@@ -14,9 +14,11 @@ import { BackupSettings } from './BackupSettings'
 
 interface Props {
   onClose: () => void
+  /** 打开「课表管理」面板（新建 / 切换 / 删除课表），由外层渲染 */
+  onManageSemesters: () => void
 }
 
-export function SettingsPage({ onClose }: Props) {
+export function SettingsPage({ onClose, onManageSemesters }: Props) {
   const { platform, repos } = useJiwei()
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null>(null)
@@ -55,6 +57,29 @@ export function SettingsPage({ onClose }: Props) {
         <BackupSettings />
 
         <section className="mb-4">
+          <h3 className="mb-2 text-xs font-medium text-muted">课表</h3>
+          <div className="rounded-lg border border-border px-3 py-2 text-xs">
+            <div className="flex justify-between py-0.5">
+              <span className="text-muted">当前课表</span>
+              <span>{semester?.name ?? '—'}</span>
+            </div>
+            <div className="flex justify-between py-0.5">
+              <span className="text-muted">开学日 / 总周数</span>
+              <span>
+                {semester ? `${semester.startDate} / ${semester.totalWeeks} 周` : '—'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="mt-2 w-full rounded-lg border border-border bg-surface py-2 text-xs hover:bg-surface-alt"
+            onClick={onManageSemesters}
+          >
+            新建 / 切换 / 删除课表
+          </button>
+        </section>
+
+        <section className="mb-4">
           <h3 className="mb-2 text-xs font-medium text-muted">当前平台能力</h3>
           <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {caps.map((c) => (
@@ -70,6 +95,10 @@ export function SettingsPage({ onClose }: Props) {
           <p className="mt-2 text-[11px] text-muted">
             闹钟（锁屏响铃）在浏览器里做不到：浏览器会冻结后台定时器，Web 推送也无权响铃。
             计划在 M5 用 Capacitor 打包成原生 App 来解决。
+          </p>
+          <p className="mt-1 text-[11px] text-muted">
+            上表只给已经能用的功能打勾；写了「计划中」的还没做，排在对应的里程碑
+            （见 docs/ROADMAP.md）。
           </p>
         </section>
 
@@ -109,7 +138,7 @@ export function SettingsPage({ onClose }: Props) {
         <section>
           <h3 className="mb-2 text-xs font-medium text-muted">关于</h3>
           <p className="text-[11px] leading-relaxed text-muted">
-            几微 · jiwei —— 面向大学生的课程表应用。当前为 M0 版本，只包含课程表模块，
+            几微 · jiwei —— 面向大学生的课程表应用。当前为 M1 版本，只包含课程表模块，
             数据全部存在本机，不做任何上传。建议定期到上方「备份与恢复」导出备份。
           </p>
         </section>

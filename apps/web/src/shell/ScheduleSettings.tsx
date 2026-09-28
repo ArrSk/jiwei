@@ -40,7 +40,8 @@ export function ScheduleSettings({ semester }: Props) {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const cfg = await loadScheduleConfig(repos)
+      // 作息按学期分开存：这张课表的设置页只读这张课表的配方
+      const cfg = await loadScheduleConfig(repos, semester.id)
       if (!alive) return
       setConfig(cfg)
       setLoaded(true)
@@ -48,7 +49,7 @@ export function ScheduleSettings({ semester }: Props) {
     return () => {
       alive = false
     }
-  }, [repos])
+  }, [repos, semester.id])
 
   const times = config.presetTimes
   const invalid = useMemo(

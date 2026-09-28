@@ -77,6 +77,11 @@ function createBlockRepo(db: JiweiDatabase): BlockRepo {
     list: () => db.blocks.toArray(),
     listByKind: (kind) => db.blocks.where('kind').equals(kind).toArray(),
     listCourses: () => db.blocks.where('kind').equals('course').toArray(),
+    // 课程类 Block 靠 anchor.semesterId 归属学期；非课程类（将来的日程/任务）不属于任何学期
+    listBySemester: (semesterId) =>
+      db.blocks
+        .filter((b) => b.anchor.type === 'curriculum' && b.anchor.semesterId === semesterId)
+        .toArray(),
     get: async (id) => (await db.blocks.get(id)) ?? null,
     put: async (block) => {
       await db.blocks.put(block)
@@ -138,6 +143,9 @@ function createMetaRepo(db: JiweiDatabase): MetaRepo {
     get: async (key) => (await db.meta.get(key))?.value ?? null,
     set: async (key, value) => {
       await db.meta.put({ key, value })
+    },
+    remove: async (key) => {
+      await db.meta.delete(key)
     },
     all: async () => {
       const rows = await db.meta.toArray()

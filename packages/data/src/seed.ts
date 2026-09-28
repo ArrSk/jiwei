@@ -31,8 +31,9 @@ export async function bootstrap(repos: Repos, options: BootstrapOptions = {}): P
   const existing = await repos.semesters.list()
   if (existing.length > 0) {
     // 学期已存在：只补写作息配置（兼容"作息可配置"上线前建的库）
-    const hasConfig = await repos.meta.get('scheduleConfig')
-    if (!hasConfig) await saveScheduleConfig(repos, config)
+    const first = existing[0]
+    const hasConfig = first ? await repos.meta.get(`scheduleConfig:${first.id}`) : null
+    if (!hasConfig && first) await saveScheduleConfig(repos, first.id, config)
     return
   }
 
@@ -53,7 +54,7 @@ export async function bootstrap(repos: Repos, options: BootstrapOptions = {}): P
 
   await repos.semesters.put(semester)
   await repos.periods.replaceAll(semesterId, buildPeriodsFromConfig(semesterId, config))
-  await saveScheduleConfig(repos, config)
+  await saveScheduleConfig(repos, semesterId, config)
   await repos.meta.set('schemaVersion', '1')
   await repos.meta.set('storageEngine', 'dexie')
   await repos.meta.set('bootstrappedAt', startedAt)

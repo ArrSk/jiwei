@@ -6,15 +6,19 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import {
+  allOccurrencesOnDate,
   currentWeek as coreCurrentWeek,
   dateForWeek,
+  describeAdjustment,
+  findAdjustmentForOccurrence,
+  isOccurrenceActive,
   nextOccurrence,
   nowIso,
   ongoingOccurrences,
-  occurrencesOnDate,
   today,
   weekdayOf,
   WEEKDAY_LABELS,
+  type Adjustment,
   type Block,
   type Occurrence,
   type Period,
@@ -37,8 +41,11 @@ import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/
 import { CourseList } from './components/CourseList'
 import { TodayCard } from './components/TodayCard'
 import { DayView } from './components/DayView'
+import { AdjustSheet } from './components/AdjustSheet'
+import { BatchEditSheet } from './components/BatchEditSheet'
 import { SettingsPage } from '../../shell/SettingsPage'
-import { weeksToFormText, periodStartOf } from '../../lib/weeks'
+import { SemesterSheet } from '../../shell/SemesterSheet'
+import { weeksToFormText, periodStartOf, parseWeeks } from '../../lib/weeks'
 
 /** 从确定性 Occurrence ID 里取回节次：`occ_<blockId>#<date>#<periodStart>` */
 
@@ -80,34 +87,10 @@ export function buildColumns(semester: Semester, week: number, todayStr: string)
 
 /**
  * 把 `1-16` / `1,3,5` / `1-16单` / `1-16双` 解析成周次数组。
- * 这是**界面输入的解析**，不是时间计算，所以放在模块内；结果仍交给 core 校验。
+ * 实现已移到 `lib/weeks.ts`（批量编辑也要用，留在页面里会形成循环依赖）；
+ * 这里重新导出，保持 `lib/weeks.test.ts` 等既有引用可用。
  */
-export function parseWeeks(text: string, totalWeeks: number): number[] {
-  const raw = text.trim()
-  if (!raw) return []
-  const oddOnly = raw.includes('单')
-  const evenOnly = raw.includes('双')
-  const cleaned = raw.replace(/[单双周\s]/g, '')
-  const weeks = new Set<number>()
-
-  for (const part of cleaned.split(/[,，]/)) {
-    if (!part) continue
-    const range = part.match(/^(\d+)\s*[-~]\s*(\d+)$/)
-    if (range) {
-      const from = Number(range[1])
-      const to = Number(range[2])
-      for (let w = Math.min(from, to); w <= Math.max(from, to); w += 1) weeks.add(w)
-      continue
-    }
-    if (/^\d+$/.test(part)) weeks.add(Number(part))
-  }
-
-  return [...weeks]
-    .filter((w) => w >= 1 && w <= totalWeeks)
-    .filter((w) => (oddOnly ? w % 2 === 1 : true))
-    .filter((w) => (evenOnly ? w % 2 === 0 : true))
-    .sort((a, b) => a - b)
-}
+export { parseWeeks } from '../../lib/weeks'
 
 /** 把一门已有课程还原成表单值，供编辑时预填 */
 export function blockToFormValue(block: Block): CourseFormValue {
@@ -142,6 +125,11 @@ export function TimetablePage() {
   /** 正在编辑的课程 id；null 表示"新增" */
   const [editingId, setEditingId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [semesterSheetOpen, setSemesterSheetOpen] = useState(false)
+  const [batchOpen, setBatchOpen] = useState(false)
+  /** 正在调课/停课的那一次课（block + 具体场次） */
+  const [adjusting, setAdjusting] = useState<{ block: Block; occ: Occurrence } | null>(null)
+  const [adjustments, setAdjustments] = useState<Adjustment[]>([])
   const [form, setForm] = useState<CourseFormValue>(() => emptyCourseForm())
 
   /** 打开"新增"表单 */
@@ -181,19 +169,23 @@ export function TimetablePage() {
         setBlocks([])
         setOccurrences([])
         setPeriods([])
+        setAdjustments([])
         setLoading(false)
         return
       }
 
-      const [courseBlocks, occ, per] = await Promise.all([
-        repos.blocks.listCourses(),
+      const [courseBlocks, occ, per, adjs] = await Promise.all([
+        // 必须按学期取课：用 listCourses() 会把别的课表的课也带进来（切换课表就串课）
+        repos.blocks.listBySemester(active.id),
         repos.occurrences.listBySemester(active.id),
         repos.periods.listBySemester(active.id),
+        repos.adjustments.listBySemester(active.id),
       ])
       if (!alive) return
       setBlocks(courseBlocks)
       setOccurrences(occ)
       setPeriods(per)
+      setAdjustments(adjs)
       setLoading(false)
     })()
     return () => {
@@ -246,12 +238,32 @@ export function TimetablePage() {
     }
   }, [occurrences, viewWeek, currentWeek])
 
-  /** 日视图那一天的日期与场次（`dayViewWeekday` 为 null 时不用） */
+  /**
+   * 日视图那一天的日期与场次（`dayViewWeekday` 为 null 时不用）。
+   *
+   * 用 `allOccurrencesOnDate` 而不是 `occurrencesOnDate`：**要显示已停课的场次**。
+   * 停课的那一次必须留在界面上（灰掉、划线），否则用户看不到自己停过课，
+   * 也就没有办法把它恢复回来。
+   */
   const dayView = useMemo(() => {
     if (dayViewWeekday === null || !semester) return null
     const date = dateForWeek(semester, viewWeek, dayViewWeekday)
-    return { weekday: dayViewWeekday, date, list: occurrencesOnDate(occurrences, date) }
+    return { weekday: dayViewWeekday, date, list: allOccurrencesOnDate(occurrences, date) }
   }, [dayViewWeekday, occurrences, semester, viewWeek])
+
+  /**
+   * 当前正在调整的那次课已有的调整记录。
+   *
+   * 用 `findAdjustmentForOccurrence`（原时间与新时间都认）：调课之后这节课在
+   * 界面上出现两次，从任意一端点进去都应该看到同一个状态、都能恢复原样。
+   */
+  const adjustingAdjustment = useMemo(
+    () =>
+      adjusting
+        ? findAdjustmentForOccurrence(adjustments, adjusting.block.id, adjusting.occ.date)
+        : undefined,
+    [adjusting, adjustments],
+  )
 
   // ── 操作 ────────────────────────────────────────────────────
   async function persistAndReload(successText: string): Promise<void> {
@@ -334,14 +346,49 @@ export function TimetablePage() {
     await persistAndReload(`已载入 ${demo.length} 门示例课程`)
   }
 
-  if (loading) return <div className="p-6 text-sm text-muted">正在读取课表…</div>
-
-  if (!semester) {
-    return <div className="p-6 text-sm text-muted">还没有学期数据，请重新打开应用以完成初始化。</div>
+  /**
+   * 批量编辑保存：写改动过的课，再统一重建场次。
+   *
+   * 一次性写完再重建（而不是每门课重建一次）—— 重建整学期场次是重活，
+   * 改 10 门课就重建 10 次会让手机明显卡顿。
+   */
+  async function handleBatchSave(updated: Block[], summary: string): Promise<void> {
+    for (const block of updated) await repos.blocks.put(block)
+    setBatchOpen(false)
+    await persistAndReload(summary)
   }
 
-  /** 一学期实际要上多少次课（排除被停课的场次），用于顶部统计 */
-  const totalOccurrences = occurrences.filter((o) => o.status !== 'cancelled').length
+  if (loading) return <div className="p-6 text-sm text-muted">正在读取课表…</div>
+
+  /*
+    一张课表都没有（用户把最后一张删掉了）。
+    这里**不能只说"请重新打开应用"** —— 那是个死胡同，用户不知道该干什么。
+    直接给一个"新建课表"的出口，并且把管理面板就渲染在这里。
+  */
+  if (!semester) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas p-8 text-center">
+        <p className="text-sm text-muted">你还没有课表。</p>
+        <button
+          type="button"
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white"
+          onClick={() => setSemesterSheetOpen(true)}
+        >
+          新建一张课表
+        </button>
+        {semesterSheetOpen ? (
+          <SemesterSheet onClose={() => setSemesterSheetOpen(false)} active={null} />
+        ) : null}
+      </div>
+    )
+  }
+
+  /**
+   * 一学期实际要上多少次课，用于顶部统计。
+   * 用 `isOccurrenceActive` 而不是只滤 `cancelled`：被调走的那一次也不算
+   * —— 否则统计数会虚高（调课一次，数字反而加一）。
+   */
+  const totalOccurrences = occurrences.filter(isOccurrenceActive).length
 
   return (
     /*
@@ -361,8 +408,22 @@ export function TimetablePage() {
           用 justify-between 做不到真正的居中（会被两侧宽度差带偏）。
         */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
-          {/* 左：占位，保持中栏绝对居中 */}
-          <div />
+          {/*
+            左：当前课表的名字（点开管理面板）。
+            这块原来是空占位，用来让「第 N 周」绝对居中 —— 现在把课表名放这里：
+            多张课表并存时，用户需要一眼看出"我现在看的是哪一张"，也需要一个入口去切换。
+          */}
+          <div className="flex min-w-0 items-center">
+            <button
+              type="button"
+              className="flex min-w-0 items-center gap-0.5 rounded-lg px-1.5 py-1 text-[12px] text-muted hover:bg-surface-alt"
+              title="管理我的课表"
+              onClick={() => setSemesterSheetOpen(true)}
+            >
+              <span className="truncate max-w-[5.5rem]">{semester.name}</span>
+              <span className="shrink-0 text-[9px]">▾</span>
+            </button>
+          </div>
 
           {/* 中：上一周 / 第 N 周 / 下一周 */}
           <div className="flex items-center gap-0.5">
@@ -450,6 +511,8 @@ export function TimetablePage() {
                 isToday={dayView.date === todayStr}
                 onOpen={openEdit}
                 onAddAt={(periodIndex) => openAdd(dayView.weekday, periodIndex)}
+                /* 每一行都能单独调课/停课 —— 这是"某一次课有变动"的唯一入口 */
+                onAdjust={(block, occ) => setAdjusting({ block, occ })}
               />
             </>
           ) : (
@@ -489,7 +552,12 @@ export function TimetablePage() {
               )}
               {/* 课程总览紧接在表格下方（与表格同处一个滚动区），不单独占页签 */}
               {blocks.length > 0 ? (
-                <CourseList courses={blocks} onDelete={handleDelete} onLoadDemo={handleLoadDemo} />
+                <CourseList
+                  courses={blocks}
+                  onDelete={handleDelete}
+                  onLoadDemo={handleLoadDemo}
+                  onBatchEdit={() => setBatchOpen(true)}
+                />
               ) : null}
             </>
           )
@@ -541,7 +609,44 @@ export function TimetablePage() {
         />
       ) : null}
 
-      {settingsOpen ? <SettingsPage onClose={() => setSettingsOpen(false)} /> : null}
+      {adjusting ? (
+        <AdjustSheet
+          block={adjusting.block}
+          occ={adjusting.occ}
+          /* 一律以"调整记录的原日期"为操作对象：
+             从调课后的新时间点进来时，动的仍然是原来那一次，语义才不会漂 */
+          adjustDate={adjustingAdjustment?.date ?? adjusting.occ.date}
+          maxPeriod={periods.length || 12}
+          existingId={adjustingAdjustment?.id ?? null}
+          existingLabel={adjustingAdjustment ? describeAdjustment(adjustingAdjustment) : null}
+          onClose={() => setAdjusting(null)}
+          onSaved={persistAndReload}
+        />
+      ) : null}
+
+      {batchOpen ? (
+        <BatchEditSheet
+          courses={blocks}
+          maxPeriod={periods.length || 12}
+          totalWeeks={semester.totalWeeks}
+          onClose={() => setBatchOpen(false)}
+          onSave={handleBatchSave}
+        />
+      ) : null}
+
+      {semesterSheetOpen ? (
+        <SemesterSheet onClose={() => setSemesterSheetOpen(false)} active={semester} />
+      ) : null}
+
+      {settingsOpen ? (
+        <SettingsPage
+          onClose={() => setSettingsOpen(false)}
+          onManageSemesters={() => {
+            setSettingsOpen(false)
+            setSemesterSheetOpen(true)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

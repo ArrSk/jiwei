@@ -6,7 +6,15 @@
  * - "实例重建丢附件 → 闹钟/笔记挂空"
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { materializeBlock, nowIso, type Alert, type Block } from '@jiwei/core'
+import {
+  cancelAdjustment,
+  materializeBlock,
+  moveAdjustment,
+  nowIso,
+  occurrenceId,
+  type Alert,
+  type Block,
+} from '@jiwei/core'
 import { bootstrap, createDexieEngine, createRepos, makeCourse, newId } from './index'
 import type { Engine, Repos } from './index'
 
@@ -228,5 +236,112 @@ describe('删除学期会连带清理其数据', () => {
     expect(await repos.periods.listBySemester(sem.id)).toHaveLength(0)
     expect(await repos.occurrences.listBySemester(sem.id)).toHaveLength(0)
     expect(await repos.blocks.listCourses()).toHaveLength(0)
+  })
+})
+
+describe('停课 / 调课落库后重建（M1-3 的数据通路）', () => {
+  /** 一门周一第 1-2 节、上第 1~3 周的课 */
+  async function withCourse() {
+    const repos = freshRepos()
+    await bootstrap(repos, { startDate: '2025-09-22' })
+    const sem = (await repos.semesters.active())!
+    const block = makeCourse({
+      semesterId: sem.id,
+      title: '高等数学',
+      weekday: 1,
+      periods: [1, 2],
+      weeks: [1, 2, 3],
+    })
+    await repos.blocks.put(block)
+    await repos.rebuildOccurrences(sem.id)
+    return { repos, semesterId: sem.id, block }
+  }
+
+  it('停课：该次变 cancelled，其他次不受影响', async () => {
+    const { repos, semesterId, block } = await withCourse()
+    await repos.adjustments.put(
+      cancelAdjustment({ blockId: block.id, semesterId, date: '2025-09-29' }),
+    )
+    await repos.rebuildOccurrences(semesterId)
+
+    const occ = await repos.occurrences.listBySemester(semesterId)
+    expect(occ.find((o) => o.date === '2025-09-29')?.status).toBe('cancelled')
+    expect(occ.find((o) => o.date === '2025-09-22')?.status).toBe('normal')
+    expect(occ).toHaveLength(3)
+  })
+
+  it('★ 调课：原时间变 moved，新时间多一条 normal 且带 movedFrom', async () => {
+    const { repos, semesterId, block } = await withCourse()
+    await repos.adjustments.put(
+      moveAdjustment({
+        blockId: block.id,
+        semesterId,
+        date: '2025-09-29',
+        newDate: '2025-10-03',
+        newPeriods: [5, 6],
+      }),
+    )
+    await repos.rebuildOccurrences(semesterId)
+
+    const occ = await repos.occurrences.listBySemester(semesterId)
+    expect(occ).toHaveLength(4)
+    expect(occ.find((o) => o.date === '2025-09-29')?.status).toBe('moved')
+
+    const movedIn = occ.find((o) => o.date === '2025-10-03')
+    expect(movedIn?.status).toBe('normal')
+    expect(movedIn?.movedFrom).toBe('2025-09-29')
+    expect(movedIn?.id).toBe(occurrenceId(block.id, '2025-10-03', 5))
+  })
+
+  it('★ 同一天只能有一条调整记录：先停课再改成调课，不会留下两条', async () => {
+    const { repos, semesterId, block } = await withCourse()
+    await repos.adjustments.put(
+      cancelAdjustment({ blockId: block.id, semesterId, date: '2025-09-29' }),
+    )
+    await repos.adjustments.put(
+      moveAdjustment({
+        blockId: block.id,
+        semesterId,
+        date: '2025-09-29',
+        newDate: '2025-10-03',
+        newPeriods: [5, 6],
+      }),
+    )
+    // 两条记录的 id 相同（确定性 id），put 是覆盖而不是新增
+    expect(await repos.adjustments.listByBlock(block.id)).toHaveLength(1)
+
+    await repos.rebuildOccurrences(semesterId)
+    const occ = await repos.occurrences.listBySemester(semesterId)
+    // 不能同时出现"停课"与"调课"两种状态
+    expect(occ.find((o) => o.date === '2025-09-29')?.status).toBe('moved')
+  })
+
+  it('撤销调整（删掉记录）后，课恢复原样', async () => {
+    const { repos, semesterId, block } = await withCourse()
+    const adj = cancelAdjustment({ blockId: block.id, semesterId, date: '2025-09-29' })
+    await repos.adjustments.put(adj)
+    await repos.rebuildOccurrences(semesterId)
+    expect(
+      (await repos.occurrences.listBySemester(semesterId)).find(
+        (o) => o.date === '2025-09-29',
+      )?.status,
+    ).toBe('cancelled')
+
+    await repos.adjustments.remove(adj.id)
+    await repos.rebuildOccurrences(semesterId)
+    expect(
+      (await repos.occurrences.listBySemester(semesterId)).find(
+        (o) => o.date === '2025-09-29',
+      )?.status,
+    ).toBe('normal')
+  })
+
+  it('删课表会连调整记录一起删掉', async () => {
+    const { repos, semesterId, block } = await withCourse()
+    await repos.adjustments.put(
+      cancelAdjustment({ blockId: block.id, semesterId, date: '2025-09-29' }),
+    )
+    await repos.semesters.remove(semesterId)
+    expect(await repos.adjustments.listBySemester(semesterId)).toHaveLength(0)
   })
 })

@@ -237,6 +237,18 @@ export type Block = z.infer<typeof Block>
 // Occurrence：展开后的"具体一次"
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * 场次状态。
+ *
+ * - `normal`   ：正常上课（也包含"补课"和"调课调进来的那一次"）
+ * - `cancelled`：这一次停课，原时间不再上课
+ * - `moved`    ：这一次被**调走**了，原时间不再上课，改到别的时间去了
+ *
+ * 注意 `moved` 描述的是**原时间上的那一次**（"这里已经没课了"），
+ * 调过去的那一次是 `normal`，靠 `movedFrom` 标明它从哪天挪过来的。
+ * 早期实现把 `moved` 打在**新日期**那一条上，结果原时间与新时间都有课
+ * （同一次课显示两遍）—— 这是调课功能必须避免的错误。
+ */
 export const OccurrenceStatus = z.enum(['normal', 'cancelled', 'moved'])
 export type OccurrenceStatus = z.infer<typeof OccurrenceStatus>
 
@@ -252,6 +264,11 @@ export const Occurrence = z.object({
   start: DateTimeStr,
   end: DateTimeStr,
   status: OccurrenceStatus.default('normal'),
+  /**
+   * 由「调课」产生的那一次，记下它原本在哪一天。
+   * 纯派生字段：`Occurrence` 每次变更都会整体重建，不进备份，因此加字段零迁移成本。
+   */
+  movedFrom: DateStr.optional(),
   /** 单次调整：改了时间/地点但没改模板 */
   override: z
     .object({

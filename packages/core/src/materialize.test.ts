@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildDefaultPeriods,
   expandWeeks,
+  isOccurrenceActive,
   materializeAll,
   materializeBlock,
   occurrenceId,
@@ -222,7 +223,7 @@ describe('adjustments：停课与调课', () => {
     expect(occ.find((o) => o.date === '2025-09-22')?.status).toBe('normal')
   })
 
-  it('move：原次标记 moved，新日期补一条（ID 按新日期派生）', () => {
+  it('move：★ 原时间不再上课（标记 moved），新日期是正常的一次课', () => {
     const occ = materializeAll(
       [block],
       ctx,
@@ -240,10 +241,63 @@ describe('adjustments：停课与调课', () => {
     )
     // 原有 3 次 + 新增 1 次
     expect(occ).toHaveLength(4)
+
+    // 原时间那一次还在记录里，但已标记为"被调走"（界面灰掉，用户可据此撤销）
+    const origin = occ.find((o) => o.date === '2025-09-29')
+    expect(origin?.status).toBe('moved')
+
+    // 新日期那一条是**正常上课**，并记下原本在哪一天
     const moved = occ.find((o) => o.date === '2025-10-04')
-    expect(moved?.status).toBe('moved')
+    expect(moved?.status).toBe('normal')
+    expect(moved?.movedFrom).toBe('2025-09-29')
     expect(moved?.start).toBe('2025-10-04T09:50:00+08:00')
     expect(moved?.id).toBe(occurrenceId(block.id, '2025-10-04', 3))
+  })
+
+  it('move：★ 不会同一次课显示两遍（同一天只有一条会真正上课的场次）', () => {
+    const occ = materializeAll(
+      [block],
+      ctx,
+      [
+        {
+          id: 'adj_2',
+          semesterId: semester.id,
+          date: '2025-09-29',
+          action: 'move',
+          blockId: block.id,
+          newDate: '2025-10-04',
+          newPeriods: [3, 4],
+        },
+      ],
+    )
+    const active = occ.filter(isOccurrenceActive)
+    // 3 次课：原来的 9/22、10/06，加上挪到 10/04 的那一次；9/29 不算
+    expect(active).toHaveLength(3)
+    expect(active.map((o) => o.date).sort()).toEqual(['2025-09-22', '2025-10-04', '2025-10-06'])
+  })
+
+  it('add（补课）：原时间照常上课，只多出一次', () => {
+    const occ = materializeAll(
+      [block],
+      ctx,
+      [
+        {
+          id: 'adj_3',
+          semesterId: semester.id,
+          date: '2025-09-29',
+          action: 'add',
+          blockId: block.id,
+          newDate: '2025-10-04',
+          newPeriods: [3, 4],
+        },
+      ],
+    )
+    expect(occ).toHaveLength(4)
+    expect(occ.find((o) => o.date === '2025-09-29')?.status).toBe('normal')
+    const extra = occ.find((o) => o.date === '2025-10-04')
+    expect(extra?.status).toBe('normal')
+    // 补课不是"从别处挪来的"，不该有 movedFrom
+    expect(extra?.movedFrom).toBeUndefined()
   })
 
   it('输出按时间升序，便于直接渲染', () => {

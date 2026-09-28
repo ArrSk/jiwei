@@ -1,4 +1,4 @@
-/** 课程清单：核对与删除。M1 会升级成"表格批量编辑"。 */
+/** 课程清单：核对、删除、进入批量编辑。 */
 import { useState } from 'react'
 import { WEEKDAY_LABELS, type Block } from '@jiwei/core'
 import { ChevronLeftIcon, TrashIcon } from '@jiwei/ui'
@@ -9,9 +9,11 @@ interface Props {
   courses: Block[]
   onDelete: (block: Block) => Promise<void>
   onLoadDemo: () => Promise<void>
+  /** 打开批量编辑（一屏内改多门课） */
+  onBatchEdit?: () => void
 }
 
-export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
+export function CourseList({ courses, onDelete, onLoadDemo, onBatchEdit }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null)
   /**
    * 默认收起。
@@ -48,13 +50,24 @@ export function CourseList({ courses, onDelete, onLoadDemo }: Props) {
           全部课程（{courses.length}）
         </button>
         {open ? (
-          <button
-            type="button"
-            className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-alt"
-            onClick={() => void onLoadDemo()}
-          >
-            再载入一次示例
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onBatchEdit ? (
+              <button
+                type="button"
+                className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-alt"
+                onClick={onBatchEdit}
+              >
+                批量编辑
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-alt"
+              onClick={() => void onLoadDemo()}
+            >
+              再载入一次示例
+            </button>
+          </div>
         ) : null}
       </div>
 

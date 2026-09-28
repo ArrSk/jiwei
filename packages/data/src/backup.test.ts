@@ -22,6 +22,7 @@ import {
   type Engine,
   type Repos,
 } from './index'
+import { loadScheduleConfig } from './schedule'
 
 let engines: Engine[] = []
 
@@ -67,7 +68,7 @@ async function seeded(): Promise<{ repos: Repos; semesterId: string }> {
 
 describe('备份导出', () => {
   it('导出内容含全部原始记录，且**不含派生的 Occurrence**', async () => {
-    const { repos } = await seeded()
+    const { repos, semesterId } = await seeded()
     const text = await exportBackup(repos, { appVersion: '0.1.0' })
     const file = parseBackup(text)
 
@@ -78,7 +79,8 @@ describe('备份导出', () => {
     expect(file.data.blocks).toHaveLength(1)
     expect(file.data.adjustments).toHaveLength(1)
     expect(file.data.periods.length).toBeGreaterThan(0)
-    expect(file.data.meta.scheduleConfig).toBeTruthy()
+    // 作息配方按学期存（每张课表一份），备份里必须带上，否则恢复后作息就丢了
+    expect(file.data.meta[`scheduleConfig:${semesterId}`]).toBeTruthy()
 
     // Occurrence 是派生数据，不进备份（避免"场次与课程对不上"）
     expect(JSON.stringify(file.data)).not.toContain('"occurrences"')
@@ -203,5 +205,25 @@ describe('端到端：导出 → 清库 → 导入', () => {
       color: b.color,
     })
     expect(after.map(pick)).toEqual(before.map(pick))
+  })
+
+  it('★ 老版本备份（作息存在全局 scheduleConfig 键）仍能正确读取', async () => {
+    const { repos, semesterId } = await seeded()
+
+    // 造一份"升级前"形态的备份：没有 scheduleConfig:<id>，只有全局键
+    const raw = JSON.parse(await exportBackup(repos)) as {
+      data: { meta: Record<string, string> }
+    }
+    const legacyConfig = raw.data.meta[`scheduleConfig:${semesterId}`]
+    expect(legacyConfig).toBeTruthy()
+    delete raw.data.meta[`scheduleConfig:${semesterId}`]
+    if (legacyConfig) raw.data.meta.scheduleConfig = legacyConfig
+
+    await importBackup(repos, JSON.stringify(raw))
+
+    // 读配置时必须回退到旧键，否则用户升级后设置页会显示成默认作息
+    const cfg = await loadScheduleConfig(repos, semesterId)
+    expect(cfg.presetTimes.length).toBeGreaterThan(0)
+    expect(cfg.presetTimes[0]?.start).toBe('08:00')
   })
 })

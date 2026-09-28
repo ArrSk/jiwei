@@ -42,6 +42,13 @@ export interface BlockRepo {
   listByKind(kind: Block['kind']): Promise<Block[]>
   /** 课表视图用：只取课程类 */
   listCourses(): Promise<Block[]>
+  /**
+   * 某一张课表（学期）里的课程。
+   *
+   * **多课表并存时视图必须用这个，不要用 `listCourses()`** ——
+   * 后者会返回所有学期的课，切到另一张课表时会串课。
+   */
+  listBySemester(semesterId: string): Promise<Block[]>
   get(id: string): Promise<Block | null>
   put(block: Block): Promise<void>
   remove(id: string): Promise<void>
@@ -58,6 +65,8 @@ export interface OccurrenceRepo {
 export interface MetaRepo {
   get(key: string): Promise<string | null>
   set(key: string, value: string): Promise<void>
+  /** 删键。删除课表时要顺手清掉它的作息配方，否则 meta 里会堆孤儿键 */
+  remove(key: string): Promise<void>
   all(): Promise<Record<string, string>>
 }
 

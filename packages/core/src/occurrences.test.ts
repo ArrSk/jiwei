@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  allOccurrencesOnDate,
   dedupeOccurrences,
   detectConflicts,
+  isOccurrenceActive,
   materializeAll,
   nextOccurrence,
   occurrencesInRange,
@@ -66,6 +68,29 @@ describe('occurrencesInRange / occurrencesOnDate', () => {
   })
 })
 
+describe('allOccurrencesOnDate', () => {
+  it('包含已停课的场次，而 occurrencesOnDate 会把它滤掉', () => {
+    const cancelled = materializeAll([math], ctx, [
+      {
+        id: 'adj_x',
+        semesterId: semester.id,
+        blockId: 'blk_math',
+        date: '2025-09-22',
+        action: 'cancel',
+      },
+    ])
+
+    expect(allOccurrencesOnDate(cancelled, '2025-09-22').map((o) => o.status)).toContain('cancelled')
+    expect(occurrencesOnDate(cancelled, '2025-09-22')).toEqual([])
+  })
+
+  it('按时间升序，且不含其他日期的场次', () => {
+    const day = allOccurrencesOnDate(all, '2025-09-22')
+    expect(day.every((o) => o.date === '2025-09-22')).toBe(true)
+    expect(day.map((o) => o.start)).toEqual([...day.map((o) => o.start)].sort())
+  })
+})
+
 describe('nextOccurrence / ongoingOccurrences', () => {
   it('课前：返回当天第一节', () => {
     const next = nextOccurrence(all, '2025-09-22T07:00:00+08:00')
@@ -90,6 +115,50 @@ describe('nextOccurrence / ongoingOccurrences', () => {
   it('ongoingOccurrences 命中区间内的场次', () => {
     const ongoing = ongoingOccurrences(all, '2025-09-22T08:30:00+08:00')
     expect(ongoing.map((o) => o.blockId)).toContain('blk_math')
+  })
+})
+
+describe('★ 停课 / 调课之后不能再提示"下一节"', () => {
+  const cancelFirst = materializeAll([math], ctx, [
+    {
+      id: 'adj_c',
+      semesterId: semester.id,
+      blockId: 'blk_math',
+      date: '2025-09-22',
+      action: 'cancel',
+    },
+  ])
+
+  it('停课的那一次不再算"下一节"，而是顺延到下一次', () => {
+    const next = nextOccurrence(cancelFirst, '2025-09-22T07:00:00+08:00')
+    expect(next?.date).toBe('2025-09-29')
+  })
+
+  it('停课的那一次不算"正在进行中"', () => {
+    expect(ongoingOccurrences(cancelFirst, '2025-09-22T08:30:00+08:00')).toEqual([])
+  })
+
+  it('被调走的那一次同样不算"下一节"', () => {
+    const movedAway = materializeAll([math], ctx, [
+      {
+        id: 'adj_m',
+        semesterId: semester.id,
+        blockId: 'blk_math',
+        date: '2025-09-22',
+        action: 'move',
+        newDate: '2025-09-27',
+        newPeriods: [1, 2],
+      },
+    ])
+    // 9/22 被调走了：下一节是调过去的 9/27，而不是留在原地的 9/22
+    const next = nextOccurrence(movedAway, '2025-09-22T07:00:00+08:00')
+    expect(next?.date).toBe('2025-09-27')
+  })
+
+  it('isOccurrenceActive：normal 为真，cancelled / moved 为假', () => {
+    expect(isOccurrenceActive({ ...all[0]!, status: 'normal' })).toBe(true)
+    expect(isOccurrenceActive({ ...all[0]!, status: 'cancelled' })).toBe(false)
+    expect(isOccurrenceActive({ ...all[0]!, status: 'moved' })).toBe(false)
   })
 })
 

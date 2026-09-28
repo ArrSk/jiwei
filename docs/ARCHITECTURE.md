@@ -142,10 +142,31 @@ Occurrence {                                     // 展开后的"具体一次"
   blockId, semesterId?, date:'YYYY-MM-DD',
   start:ISO, end:ISO,
   status: 'normal'|'cancelled'|'moved',
+  movedFrom?: 'YYYY-MM-DD',                      // 由「调课」挪过来的那一次，记原日期
   override?: { start?, end?, location?, title? }  // 单次调整
 }
 
 Adjustment { id, semesterId, date, action:'cancel'|'move'|'add', blockId, newDate?, newPeriod? }
+```
+
+**`status` 的语义（M1 明确下来，曾被实现错）**
+
+| status | 含义 | 界面表现 |
+| --- | --- | --- |
+| `normal` | 正常上课。**也包括「补课」和「调课调进来」的那一次** | 正常色块；带 `movedFrom` 时额外标「调课 · 原定 X」 |
+| `cancelled` | 这一次停课，原时间不再上课 | 置灰 + 划线，标「停课」 |
+| `moved` | 这一次被**调走**了：原时间不再上课 | 置灰 + 划线，标「已调走」 |
+
+两点必须记住，否则会重犯早期那个 bug（同一次课在原时间与新时间各显示一遍）：
+
+1. **`moved` 打在"原时间"那一条上**，不是打在新时间上 —— 它回答的是"这里已经没课了"。
+2. **`Adjustment.id` 是确定性的**（`adj_<blockId>#<date>`）：同一门课的同一天只可能有一条调整记录，
+   先停课后改调课是**覆盖**而不是新增，不会留下两条互相矛盾的记录。
+
+判断"这一次课到底上不上"一律用 `isOccurrenceActive()`，不要自己写 `status !== 'cancelled'` ——
+被调走的那一次同样不算，"下一节""今天几节课""冲突检测"都要排除它。
+
+```ts
 
 // ── 附件型资源（与 kind 无关，可挂任意锚点）─────────────────────
 Alert {                                          // 闹钟 + 提醒 统一建模

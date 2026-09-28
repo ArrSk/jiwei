@@ -14,6 +14,7 @@
 import { useState } from 'react'
 import { WEEKDAY_LABELS } from '@jiwei/core'
 import { BLOCK_PALETTES } from '../../../lib/palette'
+import { parseWeeks } from '../../../lib/weeks'
 
 export interface CourseFormValue {
   title: string
@@ -86,6 +87,29 @@ export function CourseForm({
     if (mode === 'all') patch({ weeksText: '' })
     else if (mode === 'odd') patch({ weeksText: `1-${totalWeeks}单` })
     else patch({ weeksText: `1-${totalWeeks}双` })
+  }
+
+  /**
+   * 当前生效的周次。
+   *
+   * 注意"留空 = 每周"这个约定：输入框为空时是**全部周**，而不是"一周都不上"。
+   * 所以展示与点选都必须基于 `onWeeks`（空 → 全部），
+   * 否则一打开表单就会看到 20 个周次全被划掉 —— 与真实含义正好相反。
+   */
+  const onWeeks = (() => {
+    const parsed = parseWeeks(value.weeksText, totalWeeks)
+    return parsed.length > 0 ? parsed : range(1, totalWeeks)
+  })()
+
+  /** 点掉/点上一周：结果一律写成**显式列举**，所见即所得 */
+  function toggleWeek(week: number): void {
+    const current = new Set(onWeeks)
+    if (current.has(week)) current.delete(week)
+    else current.add(week)
+
+    const next = [...current].sort((a, b) => a - b)
+    // 全选时回到"留空"这个更简洁的表示（也和后端的"空 = 每周"一致）
+    patch({ weeksText: next.length === totalWeeks ? '' : next.join(',') })
   }
 
   async function handleSubmit(): Promise<void> {
@@ -269,6 +293,40 @@ export function CourseForm({
             onChange={(e) => patch({ weeksText: e.target.value })}
           />
         </Row>
+
+        {/*
+          逐周开关：解决"跳过某几周"（例如第 5 周实习、第 9 周放假）。
+          为什么要有它：光靠手打 `1-4,7-16` 也能表达，但用户要先心算一遍，
+          而且一旦错了很难发现。点一下更直观，写回去仍是那个可读的文本格式。
+        */}
+        <div className="mb-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-[11px] text-muted">逐周开关（点一下去掉/加上这一周）</span>
+            <span className="text-[11px] text-muted">已选 {onWeeks.length} 周</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {range(1, totalWeeks).map((w) => {
+              const on = onWeeks.includes(w)
+              return (
+                <button
+                  key={w}
+                  type="button"
+                  aria-pressed={on}
+                  aria-label={`第 ${w} 周`}
+                  className={
+                    'h-7 w-7 rounded-md border text-[11px] transition-colors ' +
+                    (on
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-border bg-surface-alt text-muted line-through')
+                  }
+                  onClick={() => toggleWeek(w)}
+                >
+                  {w}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         {error ? <p className="mb-2 text-center text-xs text-danger">{error}</p> : null}
 

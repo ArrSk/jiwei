@@ -10,7 +10,7 @@ import { paletteForBlock } from '../../../lib/palette'
 import { formatWeeks, periodStartOf } from '../../../lib/weeks'
 
 interface Props {
-  /** 这一天有课的场次（已按时间排序） */
+  /** 这一天有课的场次（已按时间排序，**含已停课的**） */
   occurrences: Occurrence[]
   blockById: Map<string, Block>
   /** 这一天的完整日期 `2026-09-28` */
@@ -20,9 +20,23 @@ interface Props {
   onOpen: (block: Block) => void
   /** 点空白处新增（带上节次） */
   onAddAt?: (periodIndex: number) => void
+  /**
+   * 调课 / 停课**这一次**。
+   * 放在日视图里是因为这是唯一"看得见具体某一天"的地方 ——
+   * 在周视图上点课程块只能进入"改整学期"的编辑表单，两者语义不同，不能混用。
+   */
+  onAdjust?: (block: Block, occ: Occurrence) => void
 }
 
-export function DayView({ occurrences, blockById, date, isToday, onOpen, onAddAt }: Props) {
+export function DayView({
+  occurrences,
+  blockById,
+  date,
+  isToday,
+  onOpen,
+  onAddAt,
+  onAdjust,
+}: Props) {
   // 星期几交给 core 算 —— 项目约定：日期计算不在这里自己实现
   const weekday = weekdayOf(date)
   const dateLabel = `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`
@@ -68,6 +82,11 @@ export function DayView({ occurrences, blockById, date, isToday, onOpen, onAddAt
           const palette = paletteForBlock(block)
           const period = periodStartOf(occ.id)
           const cancelled = occ.status === 'cancelled'
+          /** 被调走的那一次：原时间不再上课，但保留显示以便撤销 */
+          const movedAway = occ.status === 'moved'
+          /** 由调课挪过来的那一次：正常上课，额外标注来源 */
+          const movedIn = occ.movedFrom
+          const inactive = cancelled || movedAway
 
           return (
             <li key={occ.id} className="flex items-stretch">
@@ -81,26 +100,25 @@ export function DayView({ occurrences, blockById, date, isToday, onOpen, onAddAt
               {/* 课程卡片：整块可点，进入编辑 */}
               <button
                 type="button"
-                disabled={cancelled}
                 className={
                   'flex min-w-0 flex-1 flex-col gap-1 px-3 py-2.5 text-left ' +
-                  (cancelled ? 'opacity-45' : 'active:bg-surface-alt')
+                  (inactive ? 'opacity-45' : 'active:bg-surface-alt')
                 }
-                style={{ backgroundColor: cancelled ? undefined : palette.bg }}
+                style={{ backgroundColor: inactive ? undefined : palette.bg }}
                 onClick={() => onOpen(block)}
               >
                 <span className="flex items-baseline gap-1.5">
                   <span
                     className={
-                      'text-[16px] font-semibold leading-snug ' + (cancelled ? 'line-through' : '')
+                      'text-[16px] font-semibold leading-snug ' +
+                      (inactive ? 'line-through' : '')
                     }
                     style={{ color: palette.text }}
                   >
                     {block.title}
                   </span>
-                  {occ.status === 'moved' ? (
-                    <span className="text-[11px] text-muted">调课</span>
-                  ) : null}
+                  {movedIn ? <span className="text-[11px] text-muted">调课</span> : null}
+                  {movedAway ? <span className="text-[11px] text-muted">已调走</span> : null}
                   {cancelled ? <span className="text-[11px] text-muted">停课</span> : null}
                 </span>
 
@@ -110,12 +128,36 @@ export function DayView({ occurrences, blockById, date, isToday, onOpen, onAddAt
                   {block.detail?.teacher ? <span>{block.detail.teacher}</span> : null}
                 </span>
 
+                {/* 调课过来的那一次，写清是从哪天挪来的 */}
+                {movedIn ? (
+                  <span className="text-[11px] opacity-70" style={{ color: palette.text }}>
+                    原定 {movedIn}
+                  </span>
+                ) : null}
+
                 {block.anchor.type === 'curriculum' ? (
                   <span className="text-[11px] opacity-70" style={{ color: palette.text }}>
                     {formatWeeks(block.anchor.weeks)}
                   </span>
                 ) : null}
               </button>
+
+              {/* 右侧：调课 / 停课这一次。独立按钮，避免和"点卡片改整门课"混在一起 */}
+              {onAdjust ? (
+                <button
+                  type="button"
+                  aria-label={`调课或停课：${block.title}`}
+                  className="flex w-[52px] shrink-0 flex-col items-center justify-center gap-0.5 border-l border-border text-muted active:bg-surface-alt"
+                  onClick={() => onAdjust(block, occ)}
+                >
+                  <span className="text-[15px] leading-none">⋯</span>
+                  <span className="text-[10px] leading-none">
+                    {/* 「调/停」= 还没动过；只要动过（停课/已调走/被调进来）都显示「已调整」，
+                        这样从调课后的新时间那一端也能点进去恢复原样 */}
+                    {occ.status === 'normal' && !occ.movedFrom ? '调/停' : '已调整'}
+                  </span>
+                </button>
+              ) : null}
             </li>
           )
         })}
