@@ -11,7 +11,7 @@
     "dev": "pnpm --filter @jiwei/web dev",
     "build": "pnpm --filter @jiwei/web build",
     "preview": "pnpm --filter @jiwei/web preview",
-    "test": "pnpm --filter @jiwei/core test && pnpm --filter @jiwei/data test",
+    "test": "pnpm --filter @jiwei/core test && pnpm --filter @jiwei/data test && pnpm --filter @jiwei/web test",
     "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/data --noEmit && tsc -p packages/ui --noEmit && tsc -p packages/platform --noEmit && tsc -p apps/web --noEmit",
     "smoke": "node scripts/smoke.mjs",
     "status": "node scripts/status.mjs",

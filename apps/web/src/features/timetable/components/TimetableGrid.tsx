@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { Block, Occurrence } from '@jiwei/core'
 import { TimeGrid, type TimeGridBlock, type TimeGridColumn, type TimeGridRow } from '@jiwei/ui'
 import { paletteForBlock } from '../../../lib/palette'
+import { formatWeeks } from '../../../lib/weeks'
 
 export interface PositionedBlock {
   block: Block
@@ -17,30 +18,13 @@ interface Props {
   columns: TimeGridColumn[]
   blocks: PositionedBlock[]
   onCellClick: (weekday: number, periodIndex: number) => void
+  /** 点课程块（进入编辑） */
+  onBlockClick?: (block: Block) => void
   /** 表头左上角格子的内容（课表在这里放月份） */
   corner?: ReactNode
 }
 
-/**
- * 把周次数组压成一句人话：`1-16周`、`1-16单周`、`1,3,5周`。
- * 空数组返回空串（调用方不渲染这一行）。
- */
-export function formatWeeks(weeks: number[]): string {
-  if (weeks.length === 0) return ''
-  const sorted = [...weeks].sort((a, b) => a - b)
-  const contiguous = sorted.every((w, i) => i === 0 || w === (sorted[i - 1] ?? 0) + 1)
-  if (contiguous) return `${sorted[0]}-${sorted[sorted.length - 1]}周`
-
-  const allOdd = sorted.every((w) => w % 2 === 1)
-  const allEven = sorted.every((w) => w % 2 === 0)
-  const expectOdd = Array.from({ length: Math.ceil((sorted[sorted.length - 1] ?? 1) / 2) }, (_, i) => i * 2 + 1)
-  if (allOdd && expectOdd.length === sorted.length) return `1-${sorted[sorted.length - 1]}单周`
-  if (allEven) return `1-${sorted[sorted.length - 1]}双周`
-
-  return `${sorted.join(',')}周`
-}
-
-export function TimetableGrid({ rows, columns, blocks, onCellClick, corner }: Props) {
+export function TimetableGrid({ rows, columns, blocks, onCellClick, onBlockClick, corner }: Props) {
   const gridBlocks: TimeGridBlock[] = blocks.map(
     ({ block, occ, weekday, periodStart, periodEnd }) => {
       // 一门课一种颜色：用户自选优先，否则按课程名稳定派生
@@ -56,6 +40,10 @@ export function TimetableGrid({ rows, columns, blocks, onCellClick, corner }: Pr
         periodEnd,
         muted: occ.status === 'cancelled',
         style: { backgroundColor: palette.bg, color: palette.text },
+        // 点课程块 → 进入编辑（M1）。停课的场次不给点，避免误改模板。
+        ...(onBlockClick && occ.status !== 'cancelled'
+          ? { onClick: () => onBlockClick(block) }
+          : {}),
         // 版式对齐参考示例：
         //   课程名**居中**加粗在上；下面依次是「@老师」「@教室」「周次」，
         //   小字、稍透明、**右对齐**（左中右的错落在窄列里反而更好读）。

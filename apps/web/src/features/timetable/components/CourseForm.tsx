@@ -48,6 +48,10 @@ interface Props {
   onClose: () => void
   maxPeriod: number
   totalWeeks: number
+  /** 编辑已有课程：标题变「编辑课程」并显示删除按钮 */
+  isEditing?: boolean
+  /** 编辑模式下删除当前课程 */
+  onDelete?: () => Promise<void>
 }
 
 /** 周次快捷选择：把「1-16」这类文本归纳成 全周 / 单周 / 双周 */
@@ -66,6 +70,8 @@ export function CourseForm({
   onClose,
   maxPeriod,
   totalWeeks,
+  isEditing = false,
+  onDelete,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,7 +115,9 @@ export function CourseForm({
           paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
         }}
       >
-        <h3 className="mb-3.5 text-center text-base font-semibold">添加课程</h3>
+        <h3 className="mb-3.5 text-center text-base font-semibold">
+          {isEditing ? '编辑课程' : '添加课程'}
+        </h3>
 
         <Row label="课程名">
           <input
@@ -265,6 +273,20 @@ export function CourseForm({
         {error ? <p className="mb-2 text-center text-xs text-danger">{error}</p> : null}
 
         <div className="mt-4 flex gap-2.5">
+          {/* 编辑模式下多一个删除按钮，占 30% 宽度 */}
+          {isEditing && onDelete ? (
+            <button
+              type="button"
+              disabled={busy}
+              className="min-h-[46px] shrink-0 basis-[30%] rounded-xl bg-danger/10 text-[15px] text-danger disabled:opacity-60"
+              onClick={() => {
+                setBusy(true)
+                void onDelete().finally(() => setBusy(false))
+              }}
+            >
+              删除
+            </button>
+          ) : null}
           <button
             type="button"
             className="min-h-[46px] flex-1 rounded-xl bg-surface-alt text-[15px] text-ink"

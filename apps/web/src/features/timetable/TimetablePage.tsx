@@ -32,6 +32,7 @@ import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
 import { SettingsPage } from '../../shell/SettingsPage'
+import { weeksToFormText } from '../../lib/weeks'
 
 /** 从确定性 Occurrence ID 里取回节次：`occ_<blockId>#<date>#<periodStart>` */
 function periodStartOf(occId: string): number {
@@ -107,6 +108,25 @@ export function parseWeeks(text: string, totalWeeks: number): number[] {
     .sort((a, b) => a - b)
 }
 
+/** 把一门已有课程还原成表单值，供编辑时预填 */
+export function blockToFormValue(block: Block): CourseFormValue {
+  const anchor = block.anchor
+  if (anchor.type !== 'curriculum') {
+    // 非教学周锚点（将来的日程/任务）暂不支持编辑，退回一个可用的空表单
+    return emptyCourseForm()
+  }
+  return {
+    title: block.title,
+    teacher: block.detail?.teacher ?? '',
+    location: block.detail?.location ?? '',
+    weekday: anchor.weekday,
+    periodStart: anchor.periods[0],
+    periodEnd: anchor.periods[1],
+    weeksText: anchor.weeks.length > 0 ? weeksToFormText(anchor.weeks) : '',
+    color: block.color ?? '',
+  }
+}
+
 export function TimetablePage() {
   const { repos, refresh, dataVersion } = useJiwei()
   const { semester, setSemester, week, setWeek, toast, view, setView } = useUiStore()
@@ -117,8 +137,34 @@ export function TimetablePage() {
   const [loading, setLoading] = useState(true)
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  /** 正在编辑的课程 id；null 表示"新增" */
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [form, setForm] = useState<CourseFormValue>(() => emptyCourseForm())
+
+  /** 打开"新增"表单 */
+  function openAdd(weekday?: number, periodIndex?: number): void {
+    setEditingId(null)
+    setForm(
+      weekday != null && periodIndex != null
+        ? emptyCourseForm(weekday, periodIndex)
+        : emptyCourseForm(),
+    )
+    setSheetOpen(true)
+  }
+
+  /** 打开"编辑"表单，用已有课程预填 */
+  function openEdit(block: Block): void {
+    setEditingId(block.id)
+    setForm(blockToFormValue(block))
+    setSheetOpen(true)
+  }
+
+  function closeSheet(): void {
+    setSheetOpen(false)
+    setEditingId(null)
+    setForm(emptyCourseForm())
+  }
 
   // ── 读取数据（dataVersion 变化即重新查询）──────────────────
   useEffect(() => {
@@ -191,6 +237,13 @@ export function TimetablePage() {
     toast(successText, 'success')
   }
 
+  /**
+   * 保存表单。
+   *
+   * 同一个入口服务"新增"与"编辑"：靠 `editingId` 区分。
+   * 编辑时**保留原 id 与 createdAt** —— 场次是按 blockId 派生 id 的，
+   * 换了 id 就等于换了一门课，挂在场次上的提醒与笔记会全部失联。
+   */
   async function handleSubmit(value: CourseFormValue): Promise<void> {
     if (!semester) return
     // 周次留空 = 每周（表单里的「全周」快选也是这个语义）
@@ -202,9 +255,12 @@ export function TimetablePage() {
       toast('周次解析为空，请检查输入（例如 1-16 或 1-16单）', 'error')
       return
     }
+
+    const existing = editingId ? blocks.find((b) => b.id === editingId) : undefined
     const at = new Date().toISOString()
+
     const block: Block = {
-      id: `blk_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
+      id: existing?.id ?? `blk_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
       kind: 'course',
       title: value.title.trim(),
       anchor: {
@@ -219,15 +275,27 @@ export function TimetablePage() {
         ...(value.teacher.trim() ? { teacher: value.teacher.trim() } : {}),
         ...(value.location.trim() ? { location: value.location.trim() } : {}),
       },
-      // 颜色：用户在表单里选了就存下来；留空则由 paletteForTitle(课程名) 派生
       ...(value.color ? { color: value.color } : {}),
-      createdAt: at,
+      createdAt: existing?.createdAt ?? at,
       updatedAt: at,
     }
+
     await repos.blocks.put(block)
-    setSheetOpen(false)
-    setForm(emptyCourseForm(value.weekday, value.periodStart))
-    await persistAndReload(`已添加「${block.title}」，共 ${weeks.length} 周`)
+    closeSheet()
+    await persistAndReload(
+      existing
+        ? `已更新「${block.title}」`
+        : `已添加「${block.title}」，共 ${weeks.length} 周`,
+    )
+  }
+
+  /** 从编辑表单里删除当前课程 */
+  async function handleDeleteEditing(): Promise<void> {
+    const existing = editingId ? blocks.find((b) => b.id === editingId) : undefined
+    if (!existing) return
+    await repos.blocks.remove(existing.id)
+    closeSheet()
+    await persistAndReload(`已删除「${existing.title}」`)
   }
 
   async function handleDelete(block: Block): Promise<void> {
@@ -351,10 +419,8 @@ export function TimetablePage() {
                     <span className="text-[11px] text-muted">月</span>
                   </div>
                 }
-                onCellClick={(weekday, periodIndex) => {
-                  setForm(emptyCourseForm(weekday, periodIndex))
-                  setSheetOpen(true)
-                }}
+                onCellClick={(weekday, periodIndex) => openAdd(weekday, periodIndex)}
+                onBlockClick={openEdit}
               />
             )}
             {/* 课程总览紧接在表格下方（与表格同处一个滚动区），不单独占页签 */}
@@ -402,9 +468,11 @@ export function TimetablePage() {
           value={form}
           onChange={setForm}
           onSubmit={handleSubmit}
-          onClose={() => setSheetOpen(false)}
+          onClose={closeSheet}
           maxPeriod={periods.length || 12}
           totalWeeks={semester.totalWeeks}
+          isEditing={editingId !== null}
+          {...(editingId !== null ? { onDelete: handleDeleteEditing } : {})}
         />
       ) : null}
 
