@@ -6,6 +6,27 @@
     <meta name="theme-color" content="#4f46e5" />
     <meta name="description" content="几微 —— 大学生日常生活 App" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!--
+      iOS「添加到主屏幕」需要的几个标签。
+
+      为什么 manifest 里已经有 display:standalone 还要写这些：
+      1. apple-touch-icon —— 不写的话 iOS 会把**当前页面的截图**当图标，
+         桌面上就是一个模糊的网页缩略图。manifest 里的 icons 在 iOS 上用途有限，
+         iOS 优先认这个 link（必须是不带圆角的满幅正方形，圆角由系统自己裁）。
+      2. apple-mobile-web-app-capable —— iOS 11.3 以前的独立窗口开关；
+         新系统读 manifest 的 display，但写上无害，且兼容老设备。
+      3. apple-mobile-web-app-title —— 桌面图标下面显示的名字（不写会取 <title>，
+         中文标题过长会被截断）。
+      4. apple-mobile-web-app-status-bar-style —— 状态栏样式。用 default
+         （白底黑字）而不是 black-translucent：后者会让网页顶到状态栏下面，
+         和本项目已经做好的安全区适配叠加时容易错位。
+    -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="几微" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
     <title>几微</title>
   </head>
   <body>

@@ -7,10 +7,13 @@
  *   3. 关键样式类真的进了产物 CSS
  *   4. PWA 必需文件（manifest / sw.js）已生成
  *   5. manifest 里 display 是 standalone（iOS 上这直接影响数据是否会被清理）
+ *   6. manifest 的 start_url 是相对路径、图标真的存在、iOS 图标标签已声明
  *
  * 为什么需要它：本项目踩过"源码里写了、产物里没有"的坑
- * （Tailwind 跨包扫描，见 docs/DESIGN-VERSIONS.md 第八节）。
- * 跑一遍 3 秒，比在浏览器里肉眼确认更早发现问题。
+ * （Tailwind 跨包扫描，见 docs/DESIGN-VERSIONS.md 第八节），
+ * 也踩过"本地完全正常、部署到子目录就坏"的坑
+ * （manifest.start_url 写成 `/`，iPhone 加到主屏幕后点开是 404）。
+ * 跑一遍 3 秒，比在真机上肉眼确认更早发现问题。
  *
  * 用法： node scripts/smoke.mjs        （需先 pnpm build）
  */
@@ -95,10 +98,70 @@ if (existsSync(manifestPath)) {
     // WebKit 明确：加到主屏的 Web App 有独立的存储计数，不会被 ITP 清理
     ok('manifest.display = standalone', manifest.display === 'standalone', String(manifest.display))
     ok('manifest 有 name', Boolean(manifest.name), String(manifest.name ?? ''))
+
+    /*
+     * ★ start_url 必须是相对路径。
+     *
+     * 这是"添加到主屏幕后用不了"的根因，踩过一次：
+     * 写成 `/` 时本地开发完全正常（应用就在根目录），
+     * 但部署到 GitHub Pages 子目录后，点桌面图标会打开
+     * `https://用户名.github.io/` —— 那是账号根目录，404。
+     * 而且 `/` 落在 scope（`/jiwei/`）之外，manifest 会被判为不适用。
+     *
+     * 所以这里断言：既不能是绝对路径，也不能跑出 scope。
+     */
+    const startUrl = String(manifest.start_url ?? '')
+    ok(
+      'manifest.start_url 是相对路径（子目录部署不会点开死页面）',
+      startUrl !== '' && !startUrl.startsWith('/') && !/^https?:/i.test(startUrl),
+      startUrl || '(缺失)',
+    )
+    const scope = String(manifest.scope ?? './')
+    ok(
+      'manifest.start_url 落在 scope 内',
+      startUrl === '' || scope === './' || startUrl.startsWith(scope),
+      `scope=${scope}`,
+    )
+
+    // 图标必须真的存在：曾经声明了两个图标但 public/ 下从来没有它们，
+    // 线上一直 404，导致桌面图标是空白的
+    const icons = Array.isArray(manifest.icons) ? manifest.icons : []
+    ok('manifest 声明了图标', icons.length > 0, `${icons.length} 个`)
+    for (const icon of icons) {
+      const src = String(icon?.src ?? '')
+      if (!src) {
+        ok('图标 src 非空', false)
+        continue
+      }
+      const iconPath = path.join(DIST, src)
+      const exists = existsSync(iconPath)
+      // 只判断存在还不够：一个 0 字节的占位文件也能"存在"
+      const size = exists ? statSync(iconPath).size : 0
+      ok(
+        `图标存在且非空: ${src}${icon?.purpose ? ` (${icon.purpose})` : ''}`,
+        exists && size > 1024,
+        exists ? `${size} bytes` : '缺失',
+      )
+    }
   } catch (err) {
     ok('manifest 可解析', false, String(err))
   }
 }
+
+// 5b. iOS 主屏幕图标：manifest 里的 icons 在 iOS 上不怎么管用，
+// 不写 apple-touch-icon 的话 iOS 会把页面截图当图标
+ok(
+  'index.html 声明了 apple-touch-icon（否则 iOS 用页面截图当图标）',
+  /rel="apple-touch-icon"/.test(html),
+)
+ok(
+  'apple-touch-icon.png 已生成',
+  existsSync(path.join(DIST, 'apple-touch-icon.png')),
+)
+ok(
+  'index.html 声明了 apple-mobile-web-app-capable',
+  /name="apple-mobile-web-app-capable"/.test(html),
+)
 
 // 6. 产物体积（防止误把大文件打进包）
 const totalKb = readdirSync(path.join(DIST, 'assets')).reduce((sum, f) => {

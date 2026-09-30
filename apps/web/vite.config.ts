@@ -27,11 +27,26 @@ export default defineConfig({
         theme_color: '#4f46e5',
         background_color: '#f8fafc',
         display: 'standalone',
-        start_url: '/',
+        /*
+         * ★ 必须是相对路径 `./`，不能写 `/`。
+         *
+         * start_url 是"从主屏幕点开图标后打开哪个地址"。
+         * 写 `/` 时：本地开发能用（应用就在根目录），
+         * 但部署到 GitHub Pages 后就变成了 `https://用户名.github.io/` ——
+         * 那是账号根目录、不是本站，直接 404，于是**图标点开是个死页面**。
+         * 更糟的是 `/` 落在 scope（`/jiwei/`）之外，manifest 会被判定不适用。
+         *
+         * 相对路径会以 manifest 自身的地址为基准解析：
+         * 线上 → `/jiwei/`，本地 → `/`，两个环境都对。
+         * 这个坑一直存在，直到真的有人在 iPhone 上加到主屏幕才暴露出来。
+         */
+        start_url: './',
+        scope: './',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          // maskable 的图形要缩进安全区，不能用上面那张普通图标顶替
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
