@@ -37,13 +37,13 @@
 ## 二、我想切回「初版」（当前版本）
 
 ```powershell
-cd E:\CodeAndProj\jiwei; git checkout design-first -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/demoCourses.ts; Remove-Item apps\web\src\lib\courseColor.ts -Force -ErrorAction SilentlyContinue
+cd path\to\jiwei; git checkout design-first -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/demoCourses.ts; Remove-Item apps\web\src\lib\courseColor.ts -Force -ErrorAction SilentlyContinue
 ```
 
 ## 三、我想切到「实色方案」
 
 ```powershell
-cd E:\CodeAndProj\jiwei; git checkout design-solid -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/courseColor.ts; Remove-Item packages\ui\src\palette.ts,apps\web\src\lib\demoCourses.ts -Force -ErrorAction SilentlyContinue
+cd path\to\jiwei; git checkout design-solid -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/courseColor.ts; Remove-Item packages\ui\src\palette.ts,apps\web\src\lib\demoCourses.ts -Force -ErrorAction SilentlyContinue
 ```
 
 > 注意：`design-solid` 的 `TimetableGrid.tsx` 引用 `lib/courseColor.ts`，
@@ -52,7 +52,7 @@ cd E:\CodeAndProj\jiwei; git checkout design-solid -- packages/ui/src/TimeGrid.t
 ## 四、我想切到「浅色方案」
 
 ```powershell
-cd E:\CodeAndProj\jiwei; git checkout design-pastel -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx packages/ui/src/palette.ts; Remove-Item apps\web\src\lib\courseColor.ts -Force -ErrorAction SilentlyContinue
+cd path\to\jiwei; git checkout design-pastel -- packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx packages/ui/src/palette.ts; Remove-Item apps\web\src\lib\courseColor.ts -Force -ErrorAction SilentlyContinue
 ```
 
 **然后必须手工补一步**（实测过，不补会报错）：
@@ -172,4 +172,3 @@ node -e "const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');
 
 > 同理，前几节里"分割线工具类 `border-border-soft` 没生成"也是同一类问题
 > （跨包 + 主题令牌），当时用属性选择器绕过了；根因其实是同一个。
-

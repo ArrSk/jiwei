@@ -17,6 +17,7 @@ export * from './seed'
 export * from './schedule'
 export * from './semesters'
 export * from './backup'
+export * from './appearance'
 export { createDatabase, JiweiDatabase, DB_VERSION, type OccurrenceRow } from './engine/dexie/db'
 export { createDexieRepos } from './engine/dexie/repos'
 

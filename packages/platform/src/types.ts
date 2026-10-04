@@ -72,10 +72,20 @@ export interface FilesAdapter {
   download(filename: string, content: string, mime?: string): void
 }
 
+/** 应用外壳状态：网络连接与“添加到主屏幕”入口。 */
+export interface AppAdapter {
+  isOnline(): boolean
+  isInstalled(): boolean
+  canInstall(): boolean
+  subscribe(listener: () => void): () => void
+  install(): Promise<'accepted' | 'dismissed' | 'unavailable'>
+}
+
 export interface Platform {
   capabilities: Capabilities
   notifications: NotificationsAdapter
   alarm: AlarmAdapter
   storage: StorageAdapter
   files: FilesAdapter
+  app: AppAdapter
 }

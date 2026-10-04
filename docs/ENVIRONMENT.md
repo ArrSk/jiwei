@@ -124,7 +124,7 @@ esbuild 启动自己的二进制时使用「常驻服务进程 + 管道 stdio」
 ### 【建议】初始化版本库（保护已完成的 M0 代码）
 
 ```powershell
-cd E:\CodeAndProj\jiwei
+cd path\to\jiwei
 git init
 git add .
 git commit -m "M0: 单仓骨架 + 完整数据模型 + 课表周视图"
@@ -143,7 +143,7 @@ git commit -m "M0: 单仓骨架 + 完整数据模型 + 课表周视图"
 ## 五、可直接复制的命令
 
 ```powershell
-cd E:\CodeAndProj\jiwei
+cd path\to\jiwei
 
 # 安装（仅在需要新增依赖时；已装好则可跳过）
 pnpm install
@@ -162,7 +162,7 @@ pnpm build
 # 开发服务器
 pnpm dev
 #   → 本机 http://localhost:5273/
-#   → 手机 http://192.168.0.103:5273/   （需同一 Wi-Fi；Windows 防火墙放行 Node）
+#   → 手机 http://<局域网IP>:5273/   （需同一 Wi-Fi；Windows 防火墙放行 Node）
 ```
 
 ---
@@ -175,7 +175,7 @@ pnpm dev
 | `@jiwei/core` 单元测试（单双周 / 跳过周 / 连堂 / 调课 / 冲突 / 跨年 / 闰年） | ✅ **44 / 44 通过** |
 | `@jiwei/data` 单元测试（迁移 / CRUD / Occurrence 幂等重建 / **重建后附件不丢**） | ✅ **11 / 11 通过** |
 | 生产构建（Vite + PWA） | ✅ **468 模块，3.25 秒**；产出 `index-*.js` 485 KB、CSS 16.6 KB、`sw.js` + `manifest.webmanifest` |
-| 开发服务器 | ✅ `http://localhost:5273/` 与 `http://192.168.0.103:5273/` 均返回 200，`/src/main.tsx` 已被正确转译 |
+| 开发服务器 | ✅ `http://localhost:5273/` 与局域网地址均返回 200，`/src/main.tsx` 已被正确转译 |
 | 单仓骨架（6 个包 + 构建与测试链路） | ✅ 完成 |
 | M0 前端代码（周视图、录课表单、课程清单、设置面板、深色模式、PWA） | ✅ 完成 |
 

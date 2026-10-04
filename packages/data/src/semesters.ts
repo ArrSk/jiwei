@@ -10,9 +10,10 @@
 import {
   buildPeriodsFromConfig,
   defaultScheduleConfig,
+  isValidDateStr,
   mondayOf,
   today,
-  type Semester,
+  Semester,
 } from '@jiwei/core'
 import type { Repos } from './types'
 import { loadScheduleConfig, saveScheduleConfig } from './schedule'
@@ -45,6 +46,7 @@ export async function createSemester(
   const at = nowIso()
   const startDate = input.startDate ?? mondayOf(today())
   const totalWeeks = input.totalWeeks ?? 20
+  if (!isValidDateStr(startDate)) throw new Error(`开学日不是有效日期：${startDate}`)
   const id = newId(ID_PREFIX.semester)
 
   // 作息配方：优先"指定的那个学期"，其次当前活跃学期，最后默认
@@ -63,6 +65,8 @@ export async function createSemester(
     createdAt: at,
     updatedAt: at,
   }
+
+  Semester.parse(semester)
 
   await repos.semesters.put(semester)
   await repos.periods.replaceAll(id, buildPeriodsFromConfig(id, config))
@@ -111,6 +115,9 @@ export async function updateSemester(
     ...(patch.totalWeeks !== undefined ? { totalWeeks: patch.totalWeeks } : {}),
     updatedAt: nowIso(),
   }
+
+  if (!isValidDateStr(next.startDate)) throw new Error(`开学日不是有效日期：${next.startDate}`)
+  Semester.parse(next)
 
   const datesChanged =
     next.startDate !== current.startDate || next.totalWeeks !== current.totalWeeks

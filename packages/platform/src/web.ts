@@ -9,6 +9,7 @@
  */
 import type {
   AlarmAdapter,
+  AppAdapter,
   Capabilities,
   FilesAdapter,
   NotificationsAdapter,
@@ -137,6 +138,64 @@ const files: FilesAdapter = {
   },
 }
 
+interface InstallPromptEvent extends Event {
+  prompt(): Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
+function createAppAdapter(): AppAdapter {
+  let deferred: InstallPromptEvent | null = null
+  const listeners = new Set<() => void>()
+  const notify = () => listeners.forEach((listener) => listener())
+  const hasWindow = typeof window !== 'undefined'
+  if (hasWindow) {
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault()
+      deferred = event as InstallPromptEvent
+      notify()
+    })
+    window.addEventListener('appinstalled', () => {
+      deferred = null
+      notify()
+    })
+  }
+  return {
+    isOnline: () => typeof navigator === 'undefined' || navigator.onLine,
+    isInstalled: () =>
+      hasWindow &&
+      (window.matchMedia?.('(display-mode: standalone)').matches === true ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true),
+    canInstall: () => deferred !== null,
+    subscribe(listener) {
+      listeners.add(listener)
+      if (hasWindow) {
+        window.addEventListener('online', listener)
+        window.addEventListener('offline', listener)
+      }
+      return () => {
+        listeners.delete(listener)
+        if (hasWindow) {
+          window.removeEventListener('online', listener)
+          window.removeEventListener('offline', listener)
+        }
+      }
+    },
+    async install() {
+      if (!deferred) return 'unavailable'
+      const prompt = deferred
+      deferred = null
+      notify()
+      try {
+        await prompt.prompt()
+        const choice = await prompt.userChoice
+        return choice.outcome
+      } finally {
+        notify()
+      }
+    },
+  }
+}
+
 export function createWebPlatform(): Platform {
   return {
     capabilities: detectCapabilities(),
@@ -144,6 +203,7 @@ export function createWebPlatform(): Platform {
     alarm: alarmStub,
     storage,
     files,
+    app: createAppAdapter(),
   }
 }
 

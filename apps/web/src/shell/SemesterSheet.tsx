@@ -94,8 +94,8 @@ export function SemesterSheet({ onClose, active }: Props) {
   }
 
   async function handleCreate(): Promise<void> {
-    if (totalWeeks < 1 || totalWeeks > 60) {
-      toast('总周数请填 1~60 之间', 'error')
+    if (totalWeeks < 1 || totalWeeks > 30) {
+      toast('总周数请填 1~30 之间', 'error')
       return
     }
     setBusy(true)
@@ -117,8 +117,8 @@ export function SemesterSheet({ onClose, active }: Props) {
 
   async function handleEdit(): Promise<void> {
     if (!editing) return
-    if (totalWeeks < 1 || totalWeeks > 60) {
-      toast('总周数请填 1~60 之间', 'error')
+    if (totalWeeks < 1 || totalWeeks > 30) {
+      toast('总周数请填 1~30 之间', 'error')
       return
     }
     setBusy(true)
@@ -201,7 +201,7 @@ export function SemesterSheet({ onClose, active }: Props) {
           <input
             type="number"
             min={1}
-            max={60}
+            max={30}
             className={inputClass}
             value={totalWeeks}
             onChange={(e) => setTotalWeeks(Number(e.target.value))}

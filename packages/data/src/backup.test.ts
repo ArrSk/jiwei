@@ -150,6 +150,23 @@ describe('备份导入', () => {
     expect(courses[0]?.title).toBe('保留的课程')
   })
 
+  it('恢复前预计算失败时，非法日期不会覆盖原数据', async () => {
+    const { repos } = await seeded()
+    const raw = JSON.parse(await exportBackup(repos)) as {
+      data: { semesters: Array<{ name: string; startDate: string }> }
+    }
+    const originalName = raw.data.semesters[0]?.name
+    if (!raw.data.semesters[0]) throw new Error('测试数据缺少学期')
+    raw.data.semesters[0].name = '不应写入的学期'
+    raw.data.semesters[0].startDate = '2026-99-99'
+
+    await expect(importBackup(repos, JSON.stringify(raw))).rejects.toThrow('不是有效日期')
+
+    const active = await repos.semesters.active()
+    expect(active?.name).toBe(originalName)
+    expect((await repos.blocks.listCourses())[0]?.title).toBe('高等数学')
+  })
+
   it('拒绝用空学期备份覆盖当前数据（防手滑清库）', async () => {
     const repos = freshRepos()
     await bootstrap(repos, { startDate: '2025-09-22' })

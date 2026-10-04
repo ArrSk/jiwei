@@ -6,7 +6,7 @@
  * 2. 全部按"本地日历语义"处理：用 `YYYY-MM-DD` 字符串而非 `Date` 传递日期，
  *    避免 UTC 偏移把周一算成周日。钟点用 `HH:mm`，只在生成 `start`/`end` 时拼成带偏移的 ISO。
  */
-import { addDays, differenceInCalendarDays, format, parse, startOfDay } from 'date-fns'
+import { addDays, differenceInCalendarDays, format, isValid, parse, startOfDay } from 'date-fns'
 
 /** 从 `YYYY-MM-DD` 解析为本地零点 Date */
 export function parseDate(date: string): Date {
@@ -20,12 +20,39 @@ export function mondayOf(date: string): string {
 
 /** 生成带时区偏移的当前时刻字符串，格式与 `Occurrence.start` 一致，可直接做字符串比较 */
 export function nowIso(): string {
-  return `${formatDate(new Date())}T${format(new Date(), 'HH:mm:ss')}+08:00`
+  const parts = schoolTimeParts(new Date())
+  return `${parts.date}T${parts.time}+08:00`
+}
+
+/** 当前学校时区（Asia/Shanghai）的日期与时间。 */
+function schoolTimeParts(value: Date): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(value)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}:${values.second}`,
+  }
 }
 
 /** Date → `YYYY-MM-DD` */
 export function formatDate(date: Date): string {
   return format(date, 'yyyy-MM-dd')
+}
+
+/** 严格校验 `YYYY-MM-DD`，拒绝 2 月 30 日和 13 月等伪日期。 */
+export function isValidDateStr(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = parse(value, 'yyyy-MM-dd', new Date())
+  return isValid(parsed) && format(parsed, 'yyyy-MM-dd') === value
 }
 
 /** 该日期是周几（1 = 周一 …… 7 = 周日，ISO 8601）。JS 的 getDay() 里周日是 0，这里统一成 7。 */

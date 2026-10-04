@@ -5,7 +5,17 @@
  * IndexedDB 没有 SQL 的事务语义，一旦中途失败留下半套数据，
  * 课表会显示成"有的一周有课、有的一周没课"，且很难排查。
  */
-import { materializeAll, type Adjustment, type Alert, type Block, type Note, type Period, type Semester } from '@jiwei/core'
+import {
+  addDaysStr,
+  isValidDateStr,
+  materializeAll,
+  type Adjustment,
+  type Alert,
+  type Block,
+  type Note,
+  type Period,
+  type Semester,
+} from '@jiwei/core'
 import type {
   AlertRepo,
   BlockRepo,
@@ -239,6 +249,9 @@ export function createDexieRepos(db: JiweiDatabase): Repos {
      * 写完再逐学期重建 Occurrence —— 只重建一次，避免不必要的事务。
      */
     async restoreAll(dump: StoreDump): Promise<void> {
+      // 先在内存中完成日期、引用和课次预计算；任何失败都不能触碰当前数据库。
+      const occurrencesBySemester = materializeDump(dump)
+
       await db.transaction(
         'rw',
         [
@@ -269,23 +282,92 @@ export function createDexieRepos(db: JiweiDatabase): Repos {
           await db.alerts.bulkPut(dump.alerts)
           await db.notes.bulkPut(dump.notes)
           await db.meta.bulkPut(Object.entries(dump.meta).map(([key, value]) => ({ key, value })))
+          for (const rows of occurrencesBySemester.values()) {
+            if (rows.length > 0) await db.occurrences.bulkPut(rows)
+          }
         },
       )
-
-      // Occurrence 是派生数据：恢复后按新数据重建
-      for (const sem of dump.semesters) {
-        await this.rebuildOccurrences(sem.id)
-      }
     },
   }
 }
 
 /** 学期最后一天的日期 */
 function endDateOf(semester: Semester): string {
-  const start = new Date(`${semester.startDate}T00:00:00`)
-  const days = semester.totalWeeks * 7 - 1
-  start.setDate(start.getDate() + days)
-  return start.toISOString().slice(0, 10)
+  return addDaysStr(semester.startDate, semester.totalWeeks * 7 - 1)
+}
+
+/**
+ * 恢复前的完整预计算。
+ *
+ * 这一步必须在清库事务之前完成：materialize 可能因为日期、作息或引用异常失败，
+ * 但用户的旧数据此时仍应保持原样。
+ */
+function materializeDump(dump: StoreDump): Map<string, OccurrenceRow[]> {
+  assertUnique(dump.semesters.map((s) => s.id), '学期 id')
+  assertUnique(dump.periods.map((p) => p.id), '作息 id')
+  assertUnique(dump.blocks.map((b) => b.id), '课程 id')
+  assertUnique(dump.adjustments.map((a) => a.id), '调整 id')
+  assertUnique(dump.alerts.map((a) => a.id), '提醒 id')
+  assertUnique(dump.notes.map((n) => n.id), '笔记 id')
+
+  const semesterIds = new Set(dump.semesters.map((s) => s.id))
+  const blockById = new Map(dump.blocks.map((b) => [b.id, b]))
+  for (const semester of dump.semesters) assertDate(semester.startDate, `学期 ${semester.id} 的开始日期`)
+  for (const period of dump.periods) {
+    if (!semesterIds.has(period.semesterId)) throw new Error(`作息 ${period.id} 引用了不存在的学期`)
+  }
+  for (const block of dump.blocks) validateBlockDates(block, semesterIds)
+  for (const adjustment of dump.adjustments) {
+    if (!semesterIds.has(adjustment.semesterId)) throw new Error(`调整 ${adjustment.id} 引用了不存在的学期`)
+    if (!blockById.has(adjustment.blockId)) throw new Error(`调整 ${adjustment.id} 引用了不存在的课程`)
+    assertDate(adjustment.date, `调整 ${adjustment.id} 的日期`)
+    if (adjustment.newDate) assertDate(adjustment.newDate, `调整 ${adjustment.id} 的新日期`)
+  }
+
+  const result = new Map<string, OccurrenceRow[]>()
+  for (const semester of dump.semesters) {
+    const periods = dump.periods.filter((p) => p.semesterId === semester.id)
+    const semesterStart = semester.startDate
+    const semesterEnd = endDateOf(semester)
+    const blocks = dump.blocks.filter((b) => belongsToSemester(b, semester.id, semesterStart, semesterEnd))
+    const adjustments = dump.adjustments.filter((a) => a.semesterId === semester.id)
+    const occurrences = materializeAll(blocks, { semester, periods }, adjustments)
+    result.set(
+      semester.id,
+      occurrences.map((o) => ({
+        ...o,
+        semesterId: semester.id,
+        periodStart: periodStartOf(o.id),
+        status: o.status ?? 'normal',
+      })),
+    )
+  }
+  return result
+}
+
+function assertUnique(values: string[], label: string): void {
+  if (new Set(values).size !== values.length) throw new Error(`备份中存在重复的${label}`)
+}
+
+function assertDate(value: string, label: string): void {
+  if (!isValidDateStr(value)) throw new Error(`${label}不是有效日期：${value}`)
+}
+
+function validateBlockDates(block: Block, semesterIds: Set<string>): void {
+  if (block.anchor.type === 'curriculum') {
+    if (!semesterIds.has(block.anchor.semesterId)) throw new Error(`课程 ${block.id} 引用了不存在的学期`)
+  } else if (block.anchor.type === 'allDay') {
+    assertDate(block.anchor.date, `课程 ${block.id} 的日期`)
+  } else {
+    assertDate(block.anchor.start.slice(0, 10), `事项 ${block.id} 的开始日期`)
+    assertDate(block.anchor.end.slice(0, 10), `事项 ${block.id} 的结束日期`)
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(block.anchor.start)) throw new Error(`事项 ${block.id} 的开始时间无效`)
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(block.anchor.end)) throw new Error(`事项 ${block.id} 的结束时间无效`)
+  }
+  if (block.repeat.mode === 'weekly') assertDate(block.repeat.until, `课程 ${block.id} 的重复结束日期`)
+  if (block.repeat.mode === 'curriculum' && !semesterIds.has(block.repeat.semesterId)) {
+    throw new Error(`课程 ${block.id} 的重复规则引用了不存在的学期`)
+  }
 }
 
 /** 判断某个 Block 是否属于该学期 */

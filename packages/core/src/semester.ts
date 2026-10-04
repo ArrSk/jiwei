@@ -12,7 +12,6 @@ import {
 import {
   addDaysStr,
   combineDateTime,
-  formatDate,
   generateSlots,
   isoWeekday,
   parseDate,
@@ -157,7 +156,14 @@ export function buildDefaultPeriods(semesterId: string, _now?: string): Period[]
 
 /** 今天的日期字符串（本地时区） */
 export function today(): string {
-  return formatDate(new Date())
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
 }
 
 /** 该日期是周几的中文序号（1=周一） */

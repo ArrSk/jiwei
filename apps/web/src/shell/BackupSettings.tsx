@@ -20,6 +20,10 @@ import { useUiStore } from '../store'
 export function BackupSettings() {
   const { repos, platform, refresh } = useJiwei()
   const toast = useUiStore((s) => s.toast)
+  const setSemester = useUiStore((s) => s.setSemester)
+  const setWeek = useUiStore((s) => s.setWeek)
+  const setDayViewWeekday = useUiStore((s) => s.setDayViewWeekday)
+  const setView = useUiStore((s) => s.setView)
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   /** 待确认的导入文件（先给用户看清楚要覆盖成什么，再动手） */
@@ -55,6 +59,12 @@ export function BackupSettings() {
     setBusy(true)
     try {
       const result = await importBackup(repos, pending.text)
+      const active = await repos.semesters.active()
+      // 恢复可能来自另一台设备：旧的学期快照、周次和日视图都不能继续沿用。
+      setSemester(active)
+      setWeek(null)
+      setDayViewWeekday(null)
+      setView('timetable')
       await refresh()
       setPending(null)
       toast(`已恢复 ${result.semesters} 个学期、${result.blocks} 门课程`, 'success')

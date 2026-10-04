@@ -11,6 +11,8 @@ import type { Semester } from '@jiwei/core'
 import { useJiwei } from '../JiweiContext'
 import { ScheduleSettings } from './ScheduleSettings'
 import { BackupSettings } from './BackupSettings'
+import { ReadingSettings } from './ReadingSettings'
+import { InstallGuide } from './InstallGuide'
 
 interface Props {
   onClose: () => void
@@ -52,6 +54,8 @@ export function SettingsPage({ onClose, onManageSemesters }: Props) {
           </button>
         </div>
 
+        <ReadingSettings />
+        <InstallGuide />
         {semester ? <ScheduleSettings semester={semester} /> : null}
 
         <BackupSettings />
@@ -138,7 +142,7 @@ export function SettingsPage({ onClose, onManageSemesters }: Props) {
         <section>
           <h3 className="mb-2 text-xs font-medium text-muted">关于</h3>
           <p className="text-[11px] leading-relaxed text-muted">
-            几微 · jiwei —— 面向大学生的课程表应用。当前为 M1 版本，只包含课程表模块，
+            几微 · jiwei —— 面向大学生的课程表应用。目前提供课程表和今天首页，
             数据全部存在本机，不做任何上传。建议定期到上方「备份与恢复」导出备份。
           </p>
         </section>

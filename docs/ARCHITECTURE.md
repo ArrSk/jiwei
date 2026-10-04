@@ -93,7 +93,7 @@ ESLint + Prettier + `tsc --noEmit` + Vitest（纯函数/数据层）+ Playwright
 | 震动 / 角标 / 后台任务 | ❌ | ❌ | ✅ |
 
 **因此**：`packages/platform` 暴露 `capabilities = { canAlarm, canBackgroundPush, canVibrate, canBadge, canFilesystem }`，
-UI 依据能力**降级展示**（Web 上"闹钟"按钮 → "提醒 + 加入系统日历"）。详细论证见 [`ALARM-STUDY.md`](ALARM-STUDY.md)。
+并通过 `app` 适配器提供在线状态和 PWA 安装入口。UI 依据能力**降级展示**（Web 上"闹钟"按钮 → "提醒 + 加入系统日历"）。详细论证见 [`ALARM-STUDY.md`](ALARM-STUDY.md)。
 
 ---
 
@@ -230,6 +230,7 @@ export interface FeatureModule {
 - 每个模块在 `apps/web/src/features/<name>/index.tsx` 导出一个 `FeatureModule`；
 - `apps/web/src/modules.ts` **静态导入**全部模块（保持类型安全与 tree-shaking，不用动态扫描）；
 - 外壳据此生成**底部导航 / 侧边栏**，并渲染首页的 widget 网格；
+- M4 起由外壳读取本地模块偏好，允许用户隐藏/启用官方模块；隐藏只影响入口和 widget，不删除模块数据；
 - **feature 之间禁止互相 import**：跨模块协作一律走 `@jiwei/core` 类型与 `@jiwei/data` 仓储。
 
 ### 5.2 为什么首版就要有它
@@ -351,5 +352,6 @@ main.tsx
 | ADR-005 | 模块化外壳 + `platform` 能力适配层 | ✅ |
 | ADR-006 | Capacitor 原生外壳承载闹钟（排期 M5） | ✅ |
 | ADR-007 | 存储实现与访问接口分离（仓储模式） | ✅ |
+| ADR-010 | 官方模块按需启用；AI 只生成待确认草稿 | ✅ |
 
-**前置设计已全部确认**，无待定项。下一步：按 [`ROADMAP.md`](ROADMAP.md) 初始化 **M0 地基**。
+**前置设计已全部确认**，无待定项。下一步：按 [`ROADMAP.md`](ROADMAP.md) 继续推进 **M2 手机可靠性**，再逐阶段实现 M3–M8。

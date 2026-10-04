@@ -112,7 +112,11 @@ export async function importBackup(repos: Repos, text: string): Promise<ImportRe
     throw new BackupError('备份里没有任何学期，拒绝用空数据覆盖当前课表')
   }
 
-  await repos.restoreAll(data as StoreDump)
+  try {
+    await repos.restoreAll(data as StoreDump)
+  } catch (err) {
+    throw new BackupError(`备份无法恢复：${err instanceof Error ? err.message : String(err)}`)
+  }
 
   return {
     semesters: data.semesters.length,

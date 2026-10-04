@@ -24,10 +24,10 @@ interface UiState {
    * 放在 store 而不是组件里，因为外壳的**底部导航**需要读写它 ——
    * 导航被锁在屏幕底部，与内容区不在同一棵组件树里。
    *
-   * `calendar` 目前是**占位页签**：日程表排在 M4，先把入口留出来。
+   * 当前只显示“今天”和“课程表”，未来模块上线后再接入导航。
    */
-  view: 'timetable' | 'calendar'
-  setView: (view: 'timetable' | 'calendar') => void
+  view: 'today' | 'timetable'
+  setView: (view: 'today' | 'timetable') => void
 
   /**
    * 正在查看的**某一天**（1=周一 … 7=周日）。
@@ -59,9 +59,9 @@ export const useUiStore = create<UiState>((set) => ({
   activeModuleId: 'timetable',
   setActiveModuleId: (id) => set({ activeModuleId: id }),
 
-  view: 'timetable',
-  // 切走时顺手退出日视图：留在"只看周三"的状态回到课表会让人以为课丢了
-  setView: (view) => set({ view, ...(view === 'calendar' ? { dayViewWeekday: null } : {}) }),
+  // 首页先展示今天；切走时顺手退出日视图。
+  view: 'today',
+  setView: (view) => set({ view, ...(view !== 'timetable' ? { dayViewWeekday: null } : {}) }),
 
   dayViewWeekday: null,
   setDayViewWeekday: (weekday) => set({ dayViewWeekday: weekday }),

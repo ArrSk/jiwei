@@ -40,10 +40,12 @@ import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
 import { TodayCard } from './components/TodayCard'
+import { TodayOverview } from './components/TodayOverview'
 import { DayView } from './components/DayView'
 import { AdjustSheet } from './components/AdjustSheet'
 import { BatchEditSheet } from './components/BatchEditSheet'
 import { SettingsPage } from '../../shell/SettingsPage'
+import { InstallHelpSheet } from '../../shell/InstallGuide'
 import { SemesterSheet } from '../../shell/SemesterSheet'
 import { weeksToFormText, periodStartOf, parseWeeks } from '../../lib/weeks'
 
@@ -112,7 +114,7 @@ export function blockToFormValue(block: Block): CourseFormValue {
 }
 
 export function TimetablePage() {
-  const { repos, refresh, dataVersion } = useJiwei()
+  const { repos, platform, refresh, dataVersion } = useJiwei()
   const { semester, setSemester, week, setWeek, toast, view, setView, dayViewWeekday, setDayViewWeekday } =
     useUiStore()
 
@@ -125,12 +127,27 @@ export function TimetablePage() {
   /** 正在编辑的课程 id；null 表示"新增" */
   const [editingId, setEditingId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [installHelpOpen, setInstallHelpOpen] = useState(false)
   const [semesterSheetOpen, setSemesterSheetOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
   /** 正在调课/停课的那一次课（block + 具体场次） */
   const [adjusting, setAdjusting] = useState<{ block: Block; occ: Occurrence } | null>(null)
   const [adjustments, setAdjustments] = useState<Adjustment[]>([])
   const [form, setForm] = useState<CourseFormValue>(() => emptyCourseForm())
+  const [clockTick, setClockTick] = useState(0)
+
+  // “今天 / 下一节”必须随时间推进，也要在从后台回到前台时立即重算。
+  useEffect(() => {
+    const tick = () => setClockTick((value) => value + 1)
+    const timer = window.setInterval(tick, 30_000)
+    window.addEventListener('focus', tick)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', tick)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [])
 
   /** 打开"新增"表单 */
   function openAdd(weekday?: number, periodIndex?: number): void {
@@ -212,22 +229,29 @@ export function TimetablePage() {
       const block = blockById.get(occ.blockId)
       if (!block) continue
       const periodStart = periodStartOf(occ.id)
+      const adjustment = findAdjustmentForOccurrence(adjustments, block.id, occ.date)
+      const periodEnd =
+        adjustment?.newDate === occ.date && adjustment.newPeriods
+          ? adjustment.newPeriods[1]
+          : block.anchor.type === 'curriculum'
+            ? block.anchor.periods[1]
+            : periodStart
       out.push({
         block,
         occ,
         weekday: weekdayOf(occ.date),
         periodStart,
-        periodEnd: block.anchor.type === 'curriculum' ? block.anchor.periods[1] : periodStart,
+        periodEnd,
       })
     }
     return out
-  }, [occurrences, blockById, semester, viewWeek])
+  }, [occurrences, adjustments, blockById, semester, viewWeek])
 
   /**
    * 「今天 / 下一节」卡片的数据。
    *
    * 只在**正在看本周**时显示 —— 翻到第 8 周却提示"下一节是高数"会让人误以为
-   * 说的是本周的安排。`nowIso()` 每次渲染重算，够用且不必引入定时器。
+   * 说的是本周的安排。时钟信号每 30 秒、回到前台和获得焦点时触发重算。
    */
   const todayCard = useMemo(() => {
     if (viewWeek !== currentWeek) return null
@@ -236,7 +260,7 @@ export function TimetablePage() {
       ongoing: ongoingOccurrences(occurrences, now),
       next: nextOccurrence(occurrences, now),
     }
-  }, [occurrences, viewWeek, currentWeek])
+  }, [occurrences, viewWeek, currentWeek, clockTick])
 
   /**
    * 日视图那一天的日期与场次（`dayViewWeekday` 为 null 时不用）。
@@ -399,21 +423,19 @@ export function TimetablePage() {
         底部页签（固定、始终可见）
       用 h-full + flex 而不是让整页滚动 —— 这样底部页签才会**锁定**在屏幕底部。
     */
-    <div className="flex h-full flex-col bg-canvas">
-      {/*
-        顶部控制栏只在「课程表」页签显示。
-        日程页签下「第 N 周 / 加课 / 设置」都没有意义 —— 日程是按真实日期走的，
-        与教学周无关；在日程页面上留着加课按钮，用户会以为加进去的是日程。
-        日程页签有自己的标题栏（见下方 header）。
-      */}
-      {view === 'calendar' ? (
-        /*
-          日程页签的标题栏：只有名字，没有任何与课表相关的控件。
-          日程按真实日期走，和教学周无关，所以这里不显示「第几周」，也不放加课按钮 ——
-          在日程页上留一个「＋」，用户会以为加进去的是日程事件。
-        */
+    <div className="reading-view flex h-full flex-col bg-canvas">
+      {/* “今天”跟随真实日期，课程表保留周次与编辑控件。 */}
+      {view === 'today' ? (
         <header className="shrink-0 border-b border-border bg-surface px-3 py-2.5">
-          <h1 className="text-center text-[15px] font-semibold">日程</h1>
+          <div className="flex items-center justify-between">
+            <button type="button" className="max-w-[10rem] truncate rounded-lg px-1.5 py-1 text-left text-[12px] text-muted hover:bg-surface-alt" onClick={() => setSemesterSheetOpen(true)}>
+              {semester?.name ?? '我的课表'} <span className="text-[9px]">▾</span>
+            </button>
+            <h1 className="text-[15px] font-semibold">今天</h1>
+            <button type="button" aria-label="设置" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt" onClick={() => setSettingsOpen(true)}>
+              <SettingsIcon className="h-5 w-5" />
+            </button>
+          </div>
         </header>
       ) : (
         <header className="shrink-0 bg-surface px-2 pb-1.5 pt-2">
@@ -501,7 +523,18 @@ export function TimetablePage() {
 
       {/* ── 内容区：唯一可滚动的部分 ─────────────────────── */}
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {view === 'timetable' ? (
+        {view === 'today' ? (
+          <TodayOverview
+            semester={semester}
+            occurrences={occurrences}
+            blocks={blocks}
+            app={platform.app}
+            onOpen={openEdit}
+            onAdjust={(block, occ) => setAdjusting({ block, occ })}
+            onGoTimetable={() => setView('timetable')}
+            onInstall={() => setInstallHelpOpen(true)}
+          />
+        ) : (
           dayView ? (
             /*
               日视图：一列铺满屏宽。
@@ -578,8 +611,6 @@ export function TimetablePage() {
               ) : null}
             </>
           )
-        ) : (
-          <CalendarPlaceholder />
         )}
       </main>
 
@@ -591,8 +622,8 @@ export function TimetablePage() {
         <div className="mx-auto flex max-w-2xl">
           {(
             [
+              ['today', '今天'],
               ['timetable', '课程表'],
-              ['calendar', '日程'],
             ] as const
           ).map(([key, label]) => {
             const active = view === key
@@ -655,6 +686,7 @@ export function TimetablePage() {
         <SemesterSheet onClose={() => setSemesterSheetOpen(false)} active={semester} />
       ) : null}
 
+      {installHelpOpen ? <InstallHelpSheet onClose={() => setInstallHelpOpen(false)} /> : null}
       {settingsOpen ? (
         <SettingsPage
           onClose={() => setSettingsOpen(false)}
@@ -691,24 +723,6 @@ function EmptyState({ onLoadDemo, onAdd }: { onLoadDemo: () => void; onAdd: () =
           载入示例课表
         </button>
       </div>
-    </div>
-  )
-}
-
-/**
- * 日程页签的**占位**。
- *
- * 日程表排在 M4，这里先把入口与版式占住。之所以不留白屏而是给一段说明：
- * 用户点到空白页会以为"坏了"，写清楚"还没做、什么时候做"才不误导。
- */
-function CalendarPlaceholder() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
-      <p className="text-sm font-medium text-muted">日程表还没做</p>
-      <p className="max-w-xs text-[11px] leading-relaxed text-muted">
-        这一块留给日程表与重要事件提醒，排在 M4。
-        课程表本身已经预留了扩展位——日程和课程共用同一套时间模型，加进来不需要改动现有功能。
-      </p>
     </div>
   )
 }

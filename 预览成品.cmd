@@ -1,0 +1,89 @@
+@echo off
+rem ===========================================================================
+rem  jiwei - PREVIEW of the built app  ->  http://localhost:4173/
+rem
+rem  Use THIS launcher (not the DEV one) when you want to test
+rem  "Add to Home Screen" on a phone, because it serves the real
+rem  manifest + icons from apps/web/dist.
+rem
+rem  It always rebuilds first, so what you preview is the current code.
+rem
+rem  ASCII-only on purpose: Chinese text inside a .cmd turns into garbage
+rem  on consoles whose code page is not UTF-8. Chinese is in the file name.
+rem ===========================================================================
+chcp 65001 >nul
+cd /d "%~dp0"
+title jiwei - PREVIEW (4173)
+
+rem Never let corepack stop and ask "do you want to download pnpm?".
+rem A double-clicked window that waits for a keypress looks like a hang.
+set "COREPACK_ENABLE_DOWNLOAD_PROMPT=0"
+
+echo ============================================================
+echo   jiwei  -  PREVIEW of the built app
+echo.
+echo   PC     : http://localhost:4173/
+echo   Phone  : see the "LAN" / "Network" lines printed below
+echo            (same Wi-Fi required)
+echo.
+echo   WARNING: over plain http the Service Worker is disabled by the
+echo   browser, so OFFLINE will NOT work here. That is expected.
+echo   Offline works on the real https site.
+echo ============================================================
+echo.
+
+rem --- pick a package manager -------------------------------------------------
+set "PM="
+where pnpm >nul 2>nul && set "PM=pnpm"
+if not defined PM (
+  where corepack >nul 2>nul && set "PM=corepack pnpm"
+)
+if not defined PM (
+  echo [!] Neither "pnpm" nor "corepack" was found.
+  echo.
+  echo     Install Node.js 22 or newer from https://nodejs.org/
+  echo     then open PowerShell and run:
+  echo.
+  echo         npm install -g pnpm
+  echo.
+  pause
+  exit /b 1
+)
+echo [i] package manager: %PM%
+echo.
+rem corepack downloads pnpm on first use, silently. Say so, or the window
+rem looks frozen for half a minute.
+echo %PM% | findstr /c:"corepack" >nul && echo [i] First run with corepack: it may download pnpm, please wait...
+echo.
+
+if not exist "node_modules" (
+  echo [i] node_modules is missing - installing dependencies now.
+  echo.
+  call %PM% install
+  if errorlevel 1 (
+    echo.
+    echo [!] install failed. If the network is unstable, run this instead:
+    echo         node scripts\install-retry.mjs 12
+    pause
+    exit /b 1
+  )
+)
+
+echo [i] Building... a fresh build is required for a correct preview.
+echo.
+call %PM% build
+if errorlevel 1 (
+  echo.
+  echo [!] build failed - scroll up to see the error.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [i] Starting the static server. Keep this window OPEN. Ctrl+C to stop.
+echo.
+node scripts\serve-dist.mjs 4173
+
+echo.
+echo [server stopped]
+pause

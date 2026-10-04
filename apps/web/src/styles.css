@@ -46,6 +46,23 @@
   --color-danger: #f87171;
 }
 
+/* M2 阅读偏好：用属性选择器统一影响首页、日视图和课表，不复制业务样式。 */
+:root[data-reading-size='large'] .reading-view {
+  font-size: 1.08rem;
+}
+
+:root[data-reading-size='large'] .reading-view .text-\[11px\] {
+  font-size: 0.82rem;
+}
+
+:root[data-reading-size='large'] .reading-view .text-\[12px\] {
+  font-size: 0.9rem;
+}
+
+:root[data-density='comfortable'] .tg-root {
+  --tg-row-h: clamp(3.7rem, 13vw, 5.3rem) !important;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -134,4 +151,3 @@
     border-color: color-mix(in oklab, var(--color-border) 60%, transparent);
   }
 }
-

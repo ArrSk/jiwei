@@ -4,8 +4,7 @@
  * 为什么需要它：手机上周视图每列只有约 45px，看得到"哪节有课"但看不清"是什么课"。
  * 这张卡片用整行宽度回答最常用的一个问题：**我现在该去哪、下节课是什么**。
  */
-import type { Occurrence } from '@jiwei/core'
-import type { Block } from '@jiwei/core'
+import { addDaysStr, today, type Occurrence, type Block } from '@jiwei/core'
 import { paletteForBlock } from '../../../lib/palette'
 import { periodStartOf } from '../../../lib/weeks'
 
@@ -74,15 +73,9 @@ export function TodayCard({ ongoing, next, blockById, onOpen }: Props) {
 
 /** 把日期说成"今天 / 明天 / 周三" */
 function relativeDay(date: string): string {
-  const today = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+  const todayStr = today()
   if (date === todayStr) return '今天'
-
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`
-  if (date === tomorrowStr) return '明天'
+  if (date === addDaysStr(todayStr, 1)) return '明天'
 
   return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
 }
