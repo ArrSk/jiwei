@@ -5,8 +5,8 @@
 **在线体验** → <https://arrsk.github.io/jiwei/>
 手机上打开后可以直接「添加到主屏幕」，当原生 App 一样用。
 
-![状态](https://img.shields.io/badge/状态-M1%20课表%20%2B%20今天首页-success)
-![测试](https://img.shields.io/badge/单元测试-136%20通过-success)
+![状态](https://img.shields.io/badge/状态-M2%20手机体验-success)
+![测试](https://img.shields.io/badge/单元测试-141%20通过-success)
 ![许可](https://img.shields.io/badge/许可-MIT-blue)
 
 ---
