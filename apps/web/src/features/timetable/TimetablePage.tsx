@@ -27,6 +27,7 @@ import {
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  CalendarIcon,
   PlusIcon,
   SettingsIcon,
   type TimeGridColumn,
@@ -45,6 +46,7 @@ import { DayView } from './components/DayView'
 import { AdjustSheet } from './components/AdjustSheet'
 import { BatchEditSheet } from './components/BatchEditSheet'
 import { SettingsPage } from '../../shell/SettingsPage'
+import { TimetableSettingsPage } from '../../shell/TimetableSettingsPage'
 import { InstallHelpSheet } from '../../shell/InstallGuide'
 import { SemesterSheet } from '../../shell/SemesterSheet'
 import { weeksToFormText, periodStartOf, parseWeeks } from '../../lib/weeks'
@@ -127,6 +129,7 @@ export function TimetablePage() {
   /** 正在编辑的课程 id；null 表示"新增" */
   const [editingId, setEditingId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [timetableSettingsOpen, setTimetableSettingsOpen] = useState(false)
   const [installHelpOpen, setInstallHelpOpen] = useState(false)
   const [semesterSheetOpen, setSemesterSheetOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
@@ -427,14 +430,15 @@ export function TimetablePage() {
       {/* “今天”跟随真实日期，课程表保留周次与编辑控件。 */}
       {view === 'today' ? (
         <header className="shrink-0 border-b border-border bg-surface px-3 py-2.5">
-          <div className="flex items-center justify-between">
-            <button type="button" className="max-w-[10rem] truncate rounded-lg px-1.5 py-1 text-left text-[12px] text-muted hover:bg-surface-alt" onClick={() => setSemesterSheetOpen(true)}>
-              {semester?.name ?? '我的课表'} <span className="text-[9px]">▾</span>
-            </button>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+            {/* “今天”只看当天信息，不重复显示课程表页的学期切换控件。 */}
+            <div aria-hidden="true" />
             <h1 className="text-[15px] font-semibold">今天</h1>
-            <button type="button" aria-label="设置" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt" onClick={() => setSettingsOpen(true)}>
-              <SettingsIcon className="h-5 w-5" />
-            </button>
+            <div className="flex justify-end">
+              <button type="button" aria-label="设置" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt" onClick={() => setSettingsOpen(true)}>
+                <SettingsIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </header>
       ) : (
@@ -501,6 +505,15 @@ export function TimetablePage() {
                 onClick={() => setSheetOpen(true)}
               >
                 <PlusIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                aria-label="课表设置"
+                title="课表设置"
+                className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
+                onClick={() => setTimetableSettingsOpen(true)}
+              >
+                <CalendarIcon className="h-5 w-5" />
               </button>
               <button
                 type="button"
@@ -687,12 +700,21 @@ export function TimetablePage() {
       ) : null}
 
       {installHelpOpen ? <InstallHelpSheet onClose={() => setInstallHelpOpen(false)} /> : null}
+      {timetableSettingsOpen ? (
+        <TimetableSettingsPage
+          onClose={() => setTimetableSettingsOpen(false)}
+          onManageSemesters={() => {
+            setTimetableSettingsOpen(false)
+            setSemesterSheetOpen(true)
+          }}
+        />
+      ) : null}
       {settingsOpen ? (
         <SettingsPage
           onClose={() => setSettingsOpen(false)}
-          onManageSemesters={() => {
+          onOpenTimetableSettings={() => {
             setSettingsOpen(false)
-            setSemesterSheetOpen(true)
+            setTimetableSettingsOpen(true)
           }}
         />
       ) : null}

@@ -7,32 +7,27 @@
  */
 import { useEffect, useState } from 'react'
 import { describeCapabilities } from '@jiwei/platform'
-import type { Semester } from '@jiwei/core'
 import { useJiwei } from '../JiweiContext'
-import { ScheduleSettings } from './ScheduleSettings'
 import { BackupSettings } from './BackupSettings'
 import { ReadingSettings } from './ReadingSettings'
 import { InstallGuide } from './InstallGuide'
 
 interface Props {
   onClose: () => void
-  /** 打开「课表管理」面板（新建 / 切换 / 删除课表），由外层渲染 */
-  onManageSemesters: () => void
+  onOpenTimetableSettings: () => void
 }
 
-export function SettingsPage({ onClose, onManageSemesters }: Props) {
-  const { platform, repos } = useJiwei()
+export function SettingsPage({ onClose, onOpenTimetableSettings }: Props) {
+  const { platform } = useJiwei()
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [estimate, setEstimate] = useState<{ usage: number; quota: number } | null>(null)
-  const [semester, setSemester] = useState<Semester | null>(null)
 
   useEffect(() => {
     void (async () => {
       setPersisted(await platform.storage.persisted())
       setEstimate(await platform.storage.estimate())
-      setSemester(await repos.semesters.active())
     })()
-  }, [platform, repos])
+  }, [platform])
 
   const caps = describeCapabilities(platform.capabilities)
 
@@ -56,32 +51,8 @@ export function SettingsPage({ onClose, onManageSemesters }: Props) {
 
         <ReadingSettings />
         <InstallGuide />
-        {semester ? <ScheduleSettings semester={semester} /> : null}
 
         <BackupSettings />
-
-        <section className="mb-4">
-          <h3 className="mb-2 text-xs font-medium text-muted">课表</h3>
-          <div className="rounded-lg border border-border px-3 py-2 text-xs">
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">当前课表</span>
-              <span>{semester?.name ?? '—'}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="text-muted">开学日 / 总周数</span>
-              <span>
-                {semester ? `${semester.startDate} / ${semester.totalWeeks} 周` : '—'}
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="mt-2 w-full rounded-lg border border-border bg-surface py-2 text-xs hover:bg-surface-alt"
-            onClick={onManageSemesters}
-          >
-            新建 / 切换 / 删除课表
-          </button>
-        </section>
 
         <section className="mb-4">
           <h3 className="mb-2 text-xs font-medium text-muted">当前平台能力</h3>
@@ -137,6 +108,14 @@ export function SettingsPage({ onClose, onManageSemesters }: Props) {
               申请持久化存储（避免浏览器自动清理数据）
             </button>
           ) : null}
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-xs font-medium text-muted">课表功能设置</h3>
+          <div className="mb-4 rounded-lg border border-border px-3 py-2.5 text-xs">
+            <p className="leading-relaxed text-muted">学期、作息和课程导入只在课程表页面使用，已集中到课程表顶部的小日历按钮。</p>
+            <button type="button" className="mt-2 w-full rounded-lg border border-border bg-surface py-2 text-xs hover:bg-surface-alt" onClick={onOpenTimetableSettings}>打开课表设置</button>
+          </div>
         </section>
 
         <section>
