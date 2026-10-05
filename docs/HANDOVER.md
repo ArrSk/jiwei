@@ -275,3 +275,10 @@ pnpm smoke
 - 课程导出按钮增加用途提示，避免把“导出到日历”误认为持续同步或订阅。
 
 本批检查：`pnpm typecheck`、`pnpm test`（154）、`pnpm build`、`pnpm smoke`（23 项）通过。浏览器本地实测设置页和课表设置页均能看到对应提示；本批未提交或推送 GitHub。
+
+## 24. 2026-10-05：M2-M3 与状态提示已推送部署
+
+- 提交 `e0a6c69` 已推送到 `origin/main`，提交作者为 `Jiwei Project <jiwei@users.noreply.github.com>`，未写入本机个人邮箱。
+- GitHub Actions 部署运行 [37289690117](https://github.com/ArrSk/jiwei/actions/runs/37289690117) 已成功完成。
+- 线上地址：<https://arrsk.github.io/jiwei/>。已读取线上构建资源，确认包含“尚未开放的功能”和“识别未开放”提示。
+- 本地构建体验服务仍可用于后续调试；线上部署与本地数据互相独立，体验前请按需导入备份。
