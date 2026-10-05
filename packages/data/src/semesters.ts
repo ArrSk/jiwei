@@ -13,6 +13,7 @@ import {
   isValidDateStr,
   mondayOf,
   today,
+  isOccurrenceActive,
   Semester,
 } from '@jiwei/core'
 import type { Repos } from './types'
@@ -175,7 +176,7 @@ export async function summarizeSemesters(repos: Repos): Promise<SemesterSummary[
       return {
         semester,
         courseCount: blocks.length,
-        occurrenceCount: occurrences.filter((o) => o.status !== 'cancelled').length,
+        occurrenceCount: occurrences.filter(isOccurrenceActive).length,
         periodCount: periods.length,
       }
     }),

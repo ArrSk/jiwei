@@ -1,4 +1,4 @@
-import { isOccurrenceActive, type Block, type Occurrence } from '@jiwei/core'
+import { diffDays, isOccurrenceActive, isoWeekday, type Block, type Occurrence } from '@jiwei/core'
 
 /** CSV 导入时先展示的课程草稿；只有用户确认后才会写入 Block。 */
 export interface CourseImportRow {
@@ -12,12 +12,81 @@ export interface CourseImportRow {
   weeks: number[]
   color: string
   errors: string[]
+  fields: CourseImportFields
+}
+
+/** 保留文件原文，让预览中的错误可以直接修改，不丢掉非法周次/节次。 */
+export interface CourseImportFields {
+  title: string
+  teacher: string
+  location: string
+  weekday: string
+  periodStart: string
+  periodEnd: string
+  weeks: string
+  color: string
+}
+
+export interface CourseImportAnalysis {
+  row: CourseImportRow
+  duplicate: boolean
+  conflicts: string[]
+}
+
+export interface CourseImportResult {
+  imported: number
+  skipped: number
+}
+
+export function validateCourseImportFields(fields: CourseImportFields, options: CourseImportOptions, line: number): CourseImportRow {
+  const title = fields.title.trim()
+  const weekday = parseWeekday(fields.weekday.trim())
+  const period = parsePeriod(fields.periodStart.trim(), fields.periodEnd.trim())
+  const weeks = parseWeeks(fields.weeks, options.totalWeeks)
+  const errors: string[] = []
+  if (!title) errors.push('缺少课程名')
+  if (weekday === null) errors.push('星期应为 1-7 或 周一至周日')
+  if (!period) errors.push('节次应填写开始节和结束节')
+  else if (period[0] < 1 || period[1] > options.maxPeriod || period[1] < period[0]) errors.push(`节次应在 1-${options.maxPeriod} 内`)
+  if (!weeks.length) errors.push(`周次应在 1-${options.totalWeeks} 内，例如 1-${options.totalWeeks}`)
+  return { line, fields: { ...fields }, title, teacher: fields.teacher.trim(), location: fields.location.trim(), weekday: weekday ?? 0, periodStart: period?.[0] ?? 0, periodEnd: period?.[1] ?? 0, weeks, color: fields.color.trim(), errors }
+}
+
+/** 重复项按课程内容和教学时间比较（忽略颜色）；重叠按共同教学周和节次提示。 */
+export function analyzeCourseImport(rows: CourseImportRow[], existing: Block[], semesterId: string): CourseImportAnalysis[] {
+  const candidates = existing.filter((block) => block.kind === 'course' && block.anchor.type === 'curriculum' && block.anchor.semesterId === semesterId)
+  return rows.map((row) => {
+    if (row.errors.length) return { row, duplicate: false, conflicts: [] }
+    const draft = courseImportRowToBlock(row, semesterId, `preview_${row.line}`, '')
+    const duplicate = candidates.some((block) => courseKey(block) === courseKey(draft))
+    const conflicts = duplicate ? [] : [...new Set(candidates.filter((block) => {
+      if (block.anchor.type !== 'curriculum') return false
+      return block.anchor.weekday === row.weekday && block.anchor.periods[0] <= row.periodEnd && block.anchor.periods[1] >= row.periodStart && block.anchor.weeks.some((week) => row.weeks.includes(week))
+    }).map((block) => block.title))]
+    if (!duplicate) candidates.push(draft)
+    return { row, duplicate, conflicts }
+  })
+}
+
+function courseKey(block: Block): string {
+  if (block.anchor.type !== 'curriculum') return ''
+  return JSON.stringify([block.title.trim(), block.detail?.teacher?.trim() ?? '', block.detail?.location?.trim() ?? '', block.anchor.weekday, block.anchor.periods, [...new Set(block.anchor.weeks)].sort((a, b) => a - b)])
 }
 
 export interface CourseImportOptions {
   semesterId: string
   totalWeeks: number
   maxPeriod: number
+  /** ICS 导入用：学期第一周周一，用来把具体日期换算成教学周。 */
+  semesterStartDate?: string
+  /** ICS 导入用：按日历事件的开始/结束时间匹配节次。 */
+  periods?: CourseImportPeriod[]
+}
+
+export interface CourseImportPeriod {
+  index: number
+  start: string
+  end: string
 }
 
 /**
@@ -51,33 +120,69 @@ export function parseCourseCsv(text: string, options: CourseImportOptions): Cour
   return rows.slice(1).flatMap((cells, rowIndex) => {
     if (cells.every((cell) => !cell.trim())) return []
     const get = (key: keyof typeof columns) => columns[key] >= 0 ? (cells[columns[key]] ?? '').trim() : ''
-    const title = get('title')
-    const weekday = parseWeekday(get('weekday'))
-    const period = parsePeriod(get('periodStart'), get('periodEnd'))
-    const weeks = parseWeeks(get('weeks'), options.totalWeeks)
-    const errors: string[] = []
-    if (!title) errors.push('缺少课程名')
-    if (weekday === null) errors.push('星期应为 1-7 或 周一至周日')
-    if (!period) errors.push('节次应填写开始节和结束节')
-    else if (period[0] < 1 || period[1] > options.maxPeriod || period[1] < period[0]) errors.push(`节次应在 1-${options.maxPeriod} 内`)
-    if (!weeks.length) errors.push(`周次应在 1-${options.totalWeeks} 内，例如 1-${options.totalWeeks}`)
-    return [{
-      line: rowIndex + 2,
-      title,
-      teacher: get('teacher'),
-      location: get('location'),
-      weekday: weekday ?? 0,
-      periodStart: period?.[0] ?? 0,
-      periodEnd: period?.[1] ?? 0,
-      weeks,
-      color: get('color'),
-      errors,
-    }]
+    return [validateCourseImportFields({ title: get('title'), teacher: get('teacher'), location: get('location'), weekday: get('weekday'), periodStart: get('periodStart'), periodEnd: get('periodEnd'), weeks: get('weeks'), color: get('color') }, options, rowIndex + 2)]
   })
 }
 
 export function courseImportTemplate(): string {
   return '\ufeff课程名,教师,教室,星期,开始节,结束节,周次,颜色\n高等数学,张老师,教西-101,一,1,2,1-16,\n'
+}
+
+/**
+ * 解析 ICS 日历文件为课程草稿。
+ *
+ * 优先识别几微导出的 X-JIWEI-* 字段；普通日历事件也可导入，
+ * 但必须能用当前作息表的时间匹配出节次。多个具体课次会按课程、教师、地点、
+ * 星期和节次合并成一门课，并把日期换算成教学周。
+ */
+export function parseCourseIcs(text: string, options: CourseImportOptions): CourseImportRow[] {
+  const events = parseIcsEvents(text)
+  if (!events.length) throw new Error('ICS 文件中没有找到课程事件')
+  if (!options.semesterStartDate) throw new Error('导入 ICS 前需要当前课表的开学日')
+  if (!options.periods?.length) throw new Error('导入 ICS 前需要先配置作息时间')
+
+  const grouped = new Map<string, { fields: CourseImportFields; weeks: Set<number>; extraErrors: string[]; line: number }>()
+  for (const [index, event] of events.entries()) {
+    const line = index + 1
+    const title = event.SUMMARY?.trim() ?? ''
+    const start = parseIcsDate(event.DTSTART)
+    const end = parseIcsDate(event.DTEND)
+    const explicitWeekday = numberField(event['X-JIWEI-WEEKDAY'])
+    const explicitPeriods = parsePeriodText(event['X-JIWEI-PERIODS'])
+    const weekday = explicitWeekday ?? (start ? isoWeekday(start.date) : 0)
+    const matched = explicitPeriods ?? (start && end ? matchPeriods(start.time, end.time, options.periods) : null)
+    const dateWeek = numberField(event['X-JIWEI-WEEK'])
+    const week = dateWeek ?? (start ? Math.floor(diffDays(options.semesterStartDate, start.date) / 7) + 1 : 0)
+    const fields: CourseImportFields = {
+      title,
+      teacher: teacherFromDescription(event.DESCRIPTION),
+      location: event.LOCATION?.trim() ?? '',
+      weekday: String(weekday || ''),
+      periodStart: matched ? String(matched[0]) : '',
+      periodEnd: matched ? String(matched[1]) : '',
+      weeks: week > 0 ? String(week) : '',
+      color: event['X-JIWEI-COLOR']?.trim() ?? '',
+    }
+    const extraErrors: string[] = []
+    if (!start) extraErrors.push('缺少或无法解析开始时间')
+    if (!end) extraErrors.push('缺少或无法解析结束时间')
+    if (start && end && !matched) extraErrors.push('日历时间无法匹配当前作息节次')
+    if (week < 1 || week > options.totalWeeks) extraErrors.push(`日期不在当前学期的 1-${options.totalWeeks} 周内`)
+    const key = event['X-JIWEI-BLOCK-ID']?.trim() || JSON.stringify([title, fields.teacher, fields.location, weekday, matched])
+    const existing = grouped.get(key)
+    if (existing) {
+      if (week > 0) existing.weeks.add(week)
+      existing.extraErrors.push(...extraErrors)
+    } else {
+      grouped.set(key, { fields, weeks: new Set(week > 0 ? [week] : []), extraErrors, line })
+    }
+  }
+
+  return [...grouped.values()].map(({ fields, weeks, extraErrors, line }) => {
+    const row = validateCourseImportFields({ ...fields, weeks: [...weeks].sort((a, b) => a - b).join(',') }, options, line)
+    row.errors.push(...extraErrors.filter((error, index, list) => list.indexOf(error) === index))
+    return row
+  })
 }
 
 /** 把当前课表导出成可再次导入的 CSV；只导出课程 Block，不包含派生课次。 */
@@ -116,6 +221,8 @@ export function exportCourseIcs(blocks: Block[], occurrences: Occurrence[], cale
     .map(({ occurrence, block }) => {
       const title = occurrence.override?.title ?? block.title
       const location = occurrence.override?.location ?? block.detail?.location ?? ''
+      const weekday = block.anchor.type === 'curriculum' ? block.anchor.weekday : isoWeekday(occurrence.date)
+      const periods = block.anchor.type === 'curriculum' ? block.anchor.periods : [0, 0]
       return [
         'BEGIN:VEVENT',
         `UID:${icsCell(occurrence.id)}@jiwei`,
@@ -125,6 +232,12 @@ export function exportCourseIcs(blocks: Block[], occurrences: Occurrence[], cale
         `SUMMARY:${icsCell(title)}`,
         ...(location ? [`LOCATION:${icsCell(location)}`] : []),
         ...(block.detail?.teacher ? [`DESCRIPTION:${icsCell(`教师：${block.detail.teacher}`)}`] : []),
+        ...(block.anchor.type === 'curriculum' ? [
+          `X-JIWEI-BLOCK-ID:${icsCell(block.id)}`,
+          `X-JIWEI-WEEKDAY:${weekday}`,
+          `X-JIWEI-PERIODS:${periods[0]}-${periods[1]}`,
+          ...(block.color ? [`X-JIWEI-COLOR:${icsCell(block.color)}`] : []),
+        ] : []),
         'END:VEVENT',
       ].join('\r\n')
     })
@@ -170,6 +283,7 @@ function parseWeekday(value: string): number | null {
 }
 
 function parsePeriod(startText: string, endText: string): [number, number] | null {
+  if (!startText) return null
   const combined = startText.match(/^(\d+)\s*[-~至]\s*(\d+)$/)
   if (combined && !endText) return [Number(combined[1]), Number(combined[2])]
   const start = Number(startText)
@@ -181,12 +295,21 @@ function parseWeeks(value: string, totalWeeks: number): number[] {
   if (!value.trim()) return Array.from({ length: totalWeeks }, (_, i) => i + 1)
   const odd = /单/.test(value)
   const even = /双/.test(value)
+  if (odd && even) return []
   const cleaned = value.replace(/[单双周\s]/g, '')
+  if (!cleaned) return Array.from({ length: totalWeeks }, (_, i) => i + 1).filter((week) => odd ? week % 2 === 1 : even ? week % 2 === 0 : true)
   const weeks = new Set<number>()
   for (const part of cleaned.split(/[,，]/)) {
     const range = part.match(/^(\d+)\s*[-~]\s*(\d+)$/)
-    if (range) for (let i = Number(range[1]); i <= Number(range[2]); i += 1) weeks.add(i)
-    else if (/^\d+$/.test(part)) weeks.add(Number(part))
+    if (range) {
+      const start = Number(range[1]), end = Number(range[2])
+      if (start < 1 || end > totalWeeks || end < start) return []
+      for (let i = start; i <= end; i += 1) weeks.add(i)
+    } else if (/^\d+$/.test(part)) {
+      const week = Number(part)
+      if (week < 1 || week > totalWeeks) return []
+      weeks.add(week)
+    } else return []
   }
   return [...weeks].filter((week) => week >= 1 && week <= totalWeeks)
     .filter((week) => (odd ? week % 2 === 1 : true))
@@ -244,5 +367,83 @@ function parseCsvRows(text: string): string[][] {
     } else cell += char
   }
   if (cell || row.length) { row.push(cell); rows.push(row) }
+  if (quoted) throw new Error('CSV 引号未闭合，请检查课程名或教室中的引号')
   return rows
+}
+
+function parseIcsEvents(text: string): Array<Record<string, string>> {
+  const lines = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n')
+  const unfolded: string[] = []
+  for (const line of lines) {
+    if (/^[ \t]/.test(line) && unfolded.length) unfolded[unfolded.length - 1] += line.slice(1)
+    else unfolded.push(line)
+  }
+  const events: Array<Record<string, string>> = []
+  let current: Record<string, string> | null = null
+  for (const line of unfolded) {
+    const upper = line.toUpperCase()
+    if (upper === 'BEGIN:VEVENT') {
+      current = {}
+      continue
+    }
+    if (upper === 'END:VEVENT') {
+      if (current) events.push(current)
+      current = null
+      continue
+    }
+    if (!current) continue
+    const colon = line.indexOf(':')
+    if (colon <= 0) continue
+    const rawKey = line.slice(0, colon).split(';', 1)[0]?.trim().toUpperCase()
+    if (!rawKey) continue
+    current[rawKey] = unescapeIcs(line.slice(colon + 1))
+  }
+  return events
+}
+
+function unescapeIcs(value: string): string {
+  return value.replace(/\\n/gi, '\n').replace(/\\([\\;,])/g, '$1')
+}
+
+function parseIcsDate(value: string | undefined): { date: string; time: string } | null {
+  if (!value) return null
+  const compact = value.trim()
+  const match = compact.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/)
+  if (!match) return null
+  if (!match[5]) return null
+  if (match[7]) {
+    const utc = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] ?? 0)))
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(utc).reduce<Record<string, string>>((result, part) => {
+      result[part.type] = part.value
+      return result
+    }, {})
+    return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` }
+  }
+  return { date: `${match[1]}-${match[2]}-${match[3]}`, time: `${match[4]}:${match[5]}` }
+}
+
+function matchPeriods(start: string, end: string, periods: CourseImportPeriod[]): [number, number] | null {
+  const first = periods.find((period) => period.start === start)
+  const last = periods.find((period) => period.end === end)
+  return first && last && last.index >= first.index ? [first.index, last.index] : null
+}
+
+function parsePeriodText(value: string | undefined): [number, number] | null {
+  const match = value?.trim().match(/^(\d+)\s*[-~]\s*(\d+)$/)
+  if (!match) return null
+  return [Number(match[1]), Number(match[2])]
+}
+
+function numberField(value: string | undefined): number | null {
+  if (!value || !/^\d+$/.test(value.trim())) return null
+  const number = Number(value.trim())
+  return Number.isInteger(number) ? number : null
+}
+
+function teacherFromDescription(value: string | undefined): string {
+  const match = value?.match(/(?:教师|老师)\s*[：:]\s*(.+)/)
+  return match?.[1]?.trim() ?? ''
 }

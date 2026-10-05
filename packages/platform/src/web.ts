@@ -134,7 +134,8 @@ const files: FilesAdapter = {
     document.body.appendChild(a)
     a.click()
     a.remove()
-    URL.revokeObjectURL(url)
+    // Safari / iOS 可能在 click 返回后才开始读取 Blob，立即释放会导致空文件。
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   },
 }
 
@@ -221,9 +222,10 @@ export function describeCapabilities(caps: Capabilities): Array<{ label: string;
     { label: '离线使用', ok: true, note: '本地优先，数据存在本机' },
     { label: '备份与恢复', ok: true, note: '导出/导入 JSON 文件' },
     { label: '日程表', ok: false, note: '计划中（M4）' },
-    { label: '待办与笔记', ok: false, note: '计划中（M6 / M7）' },
-    { label: '应用内提醒', ok: false, note: '计划中（M5），页面开着才会响' },
-    { label: '系统日历订阅 (iCal)', ok: false, note: '计划中（M3）' },
+    { label: '待办与笔记', ok: false, note: '计划中（M5 / M7）' },
+    { label: '应用内提醒', ok: false, note: '计划中（M6），页面开着才会响' },
+    { label: '课程文件进出', ok: true, note: 'JSON / CSV / ICS，可先预览再写入' },
+    { label: '系统日历文件 (iCal)', ok: true, note: '可导出 ICS 文件到系统日历' },
     {
       label: '后台推送',
       ok: caps.canBackgroundPush,

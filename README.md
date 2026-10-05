@@ -5,8 +5,8 @@
 **在线体验** → <https://arrsk.github.io/jiwei/>
 手机上打开后可以直接「添加到主屏幕」，当原生 App 一样用。
 
-![状态](https://img.shields.io/badge/状态-M2%20手机体验-success)
-![测试](https://img.shields.io/badge/单元测试-141%20通过-success)
+![状态](https://img.shields.io/badge/状态-M3%20数据进出-success)
+![测试](https://img.shields.io/badge/单元测试-154%20通过-success)
 ![许可](https://img.shields.io/badge/许可-MIT-blue)
 
 ---
@@ -104,6 +104,8 @@
 | 深色模式 | 跟随系统 | ✅ |
 | 装到手机桌面 | PWA，全屏无浏览器边框 | ✅ |
 | **备份与恢复** | 导出/导入 JSON，换设备也能带走 | ✅ |
+| **课程文件进出** | CSV / ICS 导入导出，先预览再写入 | ✅ |
+| **离线与存储保护** | PWA 缓存、离线提示、持久化申请、用量查看 | ✅ |
 | 日程表 / 笔记 / 待办 | — | ⏭ 计划中 |
 | **闹钟（锁屏响铃）** | — | ❌ **浏览器做不到**，见上方说明 |
 
@@ -123,7 +125,7 @@
 | 前端 | React 19 · Vite 7 · Tailwind CSS v4 · Zustand |
 | 本地存储 | IndexedDB（Dexie 封装），藏在仓储接口后面 |
 | 数据契约 | Zod 定义模型 + 时间计算纯函数（前后端共用的唯一真相） |
-| 测试 | Vitest（单元 136 个）· 自建冒烟检查（构建产物 23 项） |
+| 测试 | Vitest（单元 154 个）· 自建冒烟检查（构建产物 23 项） |
 | 部署 | GitHub Actions → GitHub Pages |
 | 原生（计划） | Capacitor，复用同一份 `apps/web` 代码 |
 
@@ -167,7 +169,7 @@ pnpm dev          # → http://localhost:5273/
 pnpm dev                # 开发服务器（改代码自动刷新）
 pnpm build              # 打包到 apps/web/dist
 pnpm typecheck          # 类型检查（5 个包）
-pnpm test               # 单元测试（136 个）
+pnpm test               # 单元测试（154 个）
 pnpm smoke              # 构建产物冒烟检查（23 项）
 pnpm status             # 一眼看清项目状态
 pnpm save "说明"        # 提交并推送到 GitHub
@@ -191,7 +193,7 @@ node scripts/install-retry.mjs 12           # 网络不稳时反复 install
 | 前置设计（9 条 ADR + 多份文档） | ✅ |
 | **M0 · 最小可用课表** | ✅ 已完成并验证 |
 | **M1 · 课表完整版**（改课、日视图、多课表、调课停课、批量编辑） | ✅ 已完成 |
-| M2 PWA 完善（安装引导、字号/密度） · M3 导入导出与日历订阅 | ⏭ 下一步 |
+| **M2 · 手机可靠性**（安装、离线、存储保护、字号/密度） · **M3 · 数据进出**（JSON/CSV/ICS） | ✅ 已完成本地开发与构建验收 |
 | M4~M8 日程 / 提醒 / 笔记 / 同步 | ⏭ 见 [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 **质量基线**（每次推送到 GitHub 都会自动跑一遍，**任何一步不过就拒绝发布**）：
@@ -199,7 +201,7 @@ node scripts/install-retry.mjs 12           # 网络不稳时反复 install
 | 检查 | 结果 |
 | --- | --- |
 | 类型检查（5 个包） | ✅ 通过 |
-| 单元测试 | ✅ 136 / 136（core 77 + data 44 + web 15） |
+| 单元测试 | ✅ 154 / 154（core 78 + data 61 + web 15） |
 | 生产构建 | ✅ 通过 |
 | 构建产物冒烟检查 | ✅ 23 / 23 |
 

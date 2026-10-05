@@ -14,7 +14,9 @@ import {
   occurrenceId,
   type Alert,
   type Block,
+  type Note,
 } from '@jiwei/core'
+import { parseCourseCsv } from './courseImport'
 import { bootstrap, createDexieEngine, createRepos, makeCourse, newId } from './index'
 import type { Engine, Repos } from './index'
 
@@ -343,5 +345,46 @@ describe('停课 / 调课落库后重建（M1-3 的数据通路）', () => {
     )
     await repos.semesters.remove(semesterId)
     expect(await repos.adjustments.listBySemester(semesterId)).toHaveLength(0)
+  })
+
+  it('删课程会连调整和已生成课次一起清理', async () => {
+    const { repos, semesterId, block } = await withCourse()
+    const adjustment = cancelAdjustment({ blockId: block.id, semesterId, date: '2025-09-29' })
+    await repos.adjustments.put(adjustment)
+    await repos.rebuildOccurrences(semesterId)
+    const occurrence = (await repos.occurrences.listByBlock(block.id))[0]!
+    const at = nowIso()
+    const blockAlert: Alert = { id: 'alert_block', ownerType: 'block', ownerId: block.id, leadMinutes: 10, mode: 'notify', channels: ['inapp'], repeat: 'always', enabled: true, createdAt: at }
+    const occurrenceAlert: Alert = { ...blockAlert, id: 'alert_occurrence', ownerType: 'occurrence', ownerId: occurrence.id }
+    const blockNote: Note = { id: 'note_block', ownerType: 'block', ownerId: block.id, title: '课程笔记', tags: [], createdAt: at, updatedAt: at }
+    const occurrenceNote: Note = { id: 'note_occurrence', ownerType: 'occurrence', ownerId: occurrence.id, title: '课堂笔记', tags: [], createdAt: at, updatedAt: at }
+    await repos.alerts.put(blockAlert)
+    await repos.alerts.put(occurrenceAlert)
+    await repos.notes.put(blockNote)
+    await repos.notes.put(occurrenceNote)
+    await repos.blocks.remove(block.id)
+    expect(await repos.adjustments.listByBlock(block.id)).toHaveLength(0)
+    expect(await repos.occurrences.listByBlock(block.id)).toHaveLength(0)
+    expect(await repos.blocks.get(block.id)).toBeNull()
+    expect(await repos.alerts.listByOwner('block', block.id)).toHaveLength(0)
+    expect(await repos.alerts.listByOwner('occurrence', occurrence.id)).toHaveLength(0)
+    expect(await repos.notes.listByOwner('block', block.id)).toHaveLength(0)
+    expect(await repos.notes.listByOwner('occurrence', occurrence.id)).toHaveLength(0)
+  })
+
+  it('课程导入在事务内去重并重建课次', async () => {
+    const { repos, semesterId } = await withCourse()
+    const rows = parseCourseCsv('课程名,教师,教室,星期,开始节,结束节,周次\n高等数学,,,一,1,2,1-3\n英语,李老师,外语楼,五,3,4,1-3\n', { semesterId, totalWeeks: 20, maxPeriod: 12 })
+    const result = await repos.importCourses(semesterId, rows)
+    expect(result).toEqual({ imported: 1, skipped: 1 })
+    expect((await repos.blocks.listBySemester(semesterId)).map((block) => block.title)).toEqual(['高等数学', '英语'])
+    expect((await repos.occurrences.listBySemester(semesterId)).filter((occurrence) => occurrence.blockId !== 'missing')).toHaveLength(6)
+  })
+
+  it('课程导入校验失败时不会写入任何课程', async () => {
+    const { repos, semesterId } = await withCourse()
+    const rows = parseCourseCsv('课程名,星期,开始节,结束节,周次\n新课,一,1,2,99\n', { semesterId, totalWeeks: 20, maxPeriod: 12 })
+    await expect(repos.importCourses(semesterId, rows)).rejects.toThrow('第 2 行')
+    expect((await repos.blocks.listBySemester(semesterId)).map((block) => block.title)).toEqual(['高等数学'])
   })
 })

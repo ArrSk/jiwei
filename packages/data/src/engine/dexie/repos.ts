@@ -28,6 +28,8 @@ import type {
   StoreDump,
 } from '../../types'
 import { JiweiDatabase, type OccurrenceRow } from './db'
+import { analyzeCourseImport, courseImportRowToBlock, validateCourseImportFields } from '../../courseImport'
+import { newId, nowIso } from '../../ids'
 
 /** Occurrence 的确定性 ID 形如 `occ_<blockId>#<date>#<periodStart>`，从中取回 periodStart */
 function periodStartOf(id: string): number {
@@ -52,7 +54,7 @@ function createSemesterRepo(db: JiweiDatabase): SemesterRepo {
     remove: async (id) => {
       await db.transaction(
         'rw',
-        [db.semesters, db.periods, db.blocks, db.occurrences, db.adjustments],
+        [db.semesters, db.periods, db.blocks, db.occurrences, db.adjustments, db.alerts, db.notes],
         async () => {
           await db.periods.where('semesterId').equals(id).delete()
           await db.occurrences.where('semesterId').equals(id).delete()
@@ -61,6 +63,8 @@ function createSemesterRepo(db: JiweiDatabase): SemesterRepo {
           const owned = await db.blocks
             .filter((b) => b.anchor.type === 'curriculum' && b.anchor.semesterId === id)
             .toArray()
+          const occurrences = await db.occurrences.where('semesterId').equals(id).toArray()
+          await deleteOwnedAttachments(db, [id, ...owned.map((block) => block.id), ...occurrences.map((occurrence) => occurrence.id)])
           await db.blocks.bulkDelete(owned.map((b) => b.id))
           await db.semesters.delete(id)
         },
@@ -97,7 +101,13 @@ function createBlockRepo(db: JiweiDatabase): BlockRepo {
       await db.blocks.put(block)
     },
     remove: async (id) => {
-      await db.blocks.delete(id)
+      await db.transaction('rw', [db.blocks, db.adjustments, db.occurrences, db.alerts, db.notes], async () => {
+        const occurrences = await db.occurrences.where('blockId').equals(id).toArray()
+        await db.adjustments.where('blockId').equals(id).delete()
+        await deleteOwnedAttachments(db, [id, ...occurrences.map((occurrence) => occurrence.id)])
+        await db.occurrences.where('blockId').equals(id).delete()
+        await db.blocks.delete(id)
+      })
     },
   }
 }
@@ -186,38 +196,51 @@ export function createDexieRepos(db: JiweiDatabase): Repos {
     notes: createNoteRepo(db),
     meta: createMetaRepo(db),
 
+    async importCourses(semesterId, drafts) {
+      return db.transaction('rw', [db.semesters, db.periods, db.blocks, db.adjustments, db.occurrences], async () => {
+        const semester = await db.semesters.get(semesterId)
+        if (!semester) throw new Error('目标课表已不存在，请重新选择文件')
+        const periods = await db.periods.where('semesterId').equals(semesterId).toArray()
+        const options = { semesterId, totalWeeks: semester.totalWeeks, maxPeriod: Math.max(0, ...periods.map((period) => period.index)) }
+        // 不信任界面保存的 errors 或旧作息，使用数据库当前配置重新校验。
+        const rows = drafts.map((row) => validateCourseImportFields(row.fields, options, row.line))
+        const invalid = rows.find((row) => row.errors.length)
+        if (invalid) throw new Error(`第 ${invalid.line} 行：${invalid.errors.join('；')}`)
+        const periodIndexes = new Set(periods.map((period) => period.index))
+        for (const row of rows) {
+          for (let index = row.periodStart; index <= row.periodEnd; index += 1) {
+            if (!periodIndexes.has(index)) throw new Error(`第 ${row.line} 行：第 ${index} 节没有作息时间`)
+          }
+        }
+        const allBlocks = await db.blocks.toArray()
+        const analysis = analyzeCourseImport(rows, allBlocks, semesterId)
+        const now = nowIso()
+        const additions = analysis.filter((item) => !item.duplicate).map(({ row }) => courseImportRowToBlock(row, semesterId, newId('blk'), now))
+        if (additions.length) {
+          const adjustments = await db.adjustments.where('semesterId').equals(semesterId).toArray()
+          const occurrenceRows = materializeSemesterRows([...allBlocks, ...additions], semester, periods, adjustments)
+          await db.blocks.bulkAdd(additions)
+          await db.occurrences.where('semesterId').equals(semesterId).delete()
+          await db.occurrences.bulkPut(occurrenceRows)
+        }
+        return { imported: additions.length, skipped: analysis.filter((item) => item.duplicate).length }
+      })
+    },
+
     async rebuildOccurrences(semesterId: string): Promise<number> {
-      const semester = await db.semesters.get(semesterId)
-      if (!semester) throw new Error(`学期不存在：${semesterId}`)
+      return db.transaction('rw', [db.semesters, db.periods, db.blocks, db.adjustments, db.occurrences], async () => {
+        const semester = await db.semesters.get(semesterId)
+        if (!semester) throw new Error(`学期不存在：${semesterId}`)
 
-      const periods = await db.periods.where('semesterId').equals(semesterId).sortBy('index')
-      const allBlocks = await db.blocks.toArray()
-      const adjustments = await db.adjustments.where('semesterId').equals(semesterId).toArray()
+        const periods = await db.periods.where('semesterId').equals(semesterId).sortBy('index')
+        const allBlocks = await db.blocks.toArray()
+        const adjustments = await db.adjustments.where('semesterId').equals(semesterId).toArray()
 
-      // 只展开属于该学期的 Block：教学周锚点看 semesterId；绝对时间锚点看是否落在学期日期范围内
-      const semesterStart = semester.startDate
-      const semesterEnd = endDateOf(semester)
-      const blocks = allBlocks.filter((b) => belongsToSemester(b, semesterId, semesterStart, semesterEnd))
-
-      const occurrences = materializeAll(
-        blocks as Block[],
-        { semester: semester as Semester, periods: periods as Period[] },
-        adjustments as Adjustment[],
-      )
-
-      const rows: OccurrenceRow[] = occurrences.map((o) => ({
-        ...o,
-        semesterId,
-        periodStart: periodStartOf(o.id),
-        status: o.status ?? 'normal',
-      }))
-
-      await db.transaction('rw', db.occurrences, async () => {
+        const rows = materializeSemesterRows(allBlocks, semester, periods, adjustments)
         await db.occurrences.where('semesterId').equals(semesterId).delete()
         if (rows.length > 0) await db.occurrences.bulkPut(rows)
+        return rows.length
       })
-
-      return rows.length
     },
 
     /** 导出全部原始记录（不含派生表 Occurrence） */
@@ -246,7 +269,7 @@ export function createDexieRepos(db: JiweiDatabase): Repos {
      * 用备份整体替换当前数据。
      *
      * 单个事务内"先清空再写入"：恢复要么全成、要么全不动。
-     * 写完再逐学期重建 Occurrence —— 只重建一次，避免不必要的事务。
+     * 清库前预计算全部 Occurrence，并与原始记录一起提交。
      */
     async restoreAll(dump: StoreDump): Promise<void> {
       // 先在内存中完成日期、引用和课次预计算；任何失败都不能触碰当前数据库。
@@ -289,6 +312,19 @@ export function createDexieRepos(db: JiweiDatabase): Repos {
       )
     },
   }
+}
+
+function materializeSemesterRows(allBlocks: Block[], semester: Semester, periods: Period[], adjustments: Adjustment[]): OccurrenceRow[] {
+  const blocks = allBlocks.filter((block) => belongsToSemester(block, semester.id, semester.startDate, endDateOf(semester)))
+  return materializeAll(blocks, { semester, periods }, adjustments).map((occurrence) => ({
+    ...occurrence, semesterId: semester.id, periodStart: periodStartOf(occurrence.id), status: occurrence.status ?? 'normal',
+  }))
+}
+
+async function deleteOwnedAttachments(db: JiweiDatabase, ownerIds: string[]): Promise<void> {
+  if (!ownerIds.length) return
+  await db.alerts.where('ownerId').anyOf(ownerIds).delete()
+  await db.notes.where('ownerId').anyOf(ownerIds).delete()
 }
 
 /** 学期最后一天的日期 */

@@ -33,9 +33,13 @@ Invoke-Step "typecheck:web" "$root\apps\web\node_modules\.bin\tsc.CMD" @('--noEm
 foreach ($pkg in @('core', 'data')) {
   Invoke-Step "test:$pkg" "$root\packages\$pkg\node_modules\.bin\vitest.CMD" @('run', '--reporter=default') "$root\packages\$pkg"
 }
+Invoke-Step "test:web" "$root\apps\web\node_modules\.bin\vitest.CMD" @('run', '--reporter=default') "$root\apps\web"
 
 # 3) 生产构建（Vite + PWA）
 Invoke-Step "build:web" "$root\apps\web\node_modules\.bin\vite.CMD" @('build') "$root\apps\web"
+
+# 4) 构建后冒烟检查（验证静态资源和关键入口）
+Invoke-Step "smoke" "node" @('scripts/smoke.mjs') "$root"
 
 Write-Output ""
 Write-Output "================ 汇总 ================"

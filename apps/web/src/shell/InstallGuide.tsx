@@ -28,7 +28,7 @@ export function InstallGuide() {
       <h3 className="mb-2 text-sm font-medium">安装与离线使用</h3>
       <div className="space-y-3 rounded-lg border border-border p-3 text-sm leading-relaxed">
         {app.isInstalled() ? <p className="font-medium text-brand">当前已从桌面应用打开</p> : <>
-          {app.canInstall() ? <button type="button" disabled={busy} className="min-h-[44px] w-full rounded-lg bg-brand px-3 text-white disabled:opacity-50" onClick={() => void install()}>安装几微</button> : null}
+          {app.canInstall() ? <button type="button" disabled={busy} className="min-h-[44px] w-full rounded-lg bg-brand px-3 text-white disabled:opacity-50" onClick={() => void install()}>安装几微</button> : <p className="rounded-md bg-surface-alt px-2.5 py-2 text-xs text-muted">当前浏览器没有提供一键安装按钮，请按下面的浏览器菜单步骤添加。</p>}
           <p><strong>iPhone / iPad：</strong>在 Safari 中打开页面，点“分享”，选择“添加到主屏幕”，再点“添加”。</p>
           <p><strong>安卓：</strong>在 Chrome 中打开页面，点右上角菜单，选择“安装应用”或“添加到主屏幕”。</p>
           <p><strong>电脑：</strong>在 Chrome / Edge 中查看地址栏安装图标，或浏览器菜单中的安装选项。</p>

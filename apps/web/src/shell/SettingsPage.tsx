@@ -78,6 +78,21 @@ export function SettingsPage({ onClose, onOpenTimetableSettings }: Props) {
         </section>
 
         <section className="mb-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-medium text-muted">尚未开放的功能</h3>
+            <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[10px] text-muted">开发中</span>
+          </div>
+          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            <PlannedFeature name="日程 / 考试" stage="M4" note="会加入月历、时间线和今天首页" />
+            <PlannedFeature name="待办 / 记账" stage="M5" note="会加入待办截止日和收支摘要" />
+            <PlannedFeature name="提醒 / 原生通知" stage="M6" note="浏览器目前不能保证锁屏提醒" />
+            <PlannedFeature name="文字 / 手写笔记" stage="M7" note="会加入课程关联和搜索" />
+            <PlannedFeature name="AI 助手 / 图片识别" stage="M8" note="默认关闭，只生成待确认草稿" />
+          </ul>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">这些功能当前没有可用入口，看到“开发中”时无需反复点击或提交数据。</p>
+        </section>
+
+        <section className="mb-4">
           <h3 className="mb-2 text-xs font-medium text-muted">本地数据</h3>
           <div className="rounded-lg border border-border px-3 py-2 text-xs">
             <div className="flex justify-between py-0.5">
@@ -108,6 +123,9 @@ export function SettingsPage({ onClose, onOpenTimetableSettings }: Props) {
               申请持久化存储（避免浏览器自动清理数据）
             </button>
           ) : null}
+          {platform.capabilities.canPersistStorage === false ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-muted">当前浏览器不支持持久化申请，请定期导出备份，避免浏览器清理本地数据。</p>
+          ) : null}
         </section>
 
         <section>
@@ -127,6 +145,18 @@ export function SettingsPage({ onClose, onOpenTimetableSettings }: Props) {
         </section>
       </div>
     </div>
+  )
+}
+
+function PlannedFeature({ name, stage, note }: { name: string; stage: string; note: string }) {
+  return (
+    <li className="flex items-start gap-2 px-3 py-2 text-xs">
+      <span className="mt-0.5 shrink-0 rounded bg-surface-alt px-1.5 py-0.5 text-[10px] text-muted">{stage}</span>
+      <span className="min-w-0 flex-1">
+        <span className="font-medium">{name}</span>
+        <span className="ml-1 text-muted">{note}</span>
+      </span>
+    </li>
   )
 }
 

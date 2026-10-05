@@ -20,8 +20,13 @@ function apply(theme: 'light' | 'dark'): void {
 }
 
 function readStored(): ThemeMode {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : 'system'
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : 'system'
+  } catch {
+    // 隐私模式或浏览器禁用存储时仍允许应用启动，只是不保存主题偏好。
+    return 'system'
+  }
 }
 
 export function useTheme() {
@@ -29,7 +34,11 @@ export function useTheme() {
 
   useEffect(() => {
     apply(resolve(mode))
-    localStorage.setItem(STORAGE_KEY, mode)
+    try {
+      localStorage.setItem(STORAGE_KEY, mode)
+    } catch {
+      // 主题切换本身仍然生效；持久化失败不应阻塞页面。
+    }
 
     if (mode !== 'system') return
     const mq = window.matchMedia('(prefers-color-scheme: dark)')

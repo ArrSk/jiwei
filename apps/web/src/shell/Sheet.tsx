@@ -33,6 +33,9 @@ export function Sheet({ title, onClose, children, footer, headerExtra, maxHeight
         onClick={onClose}
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="relative w-full max-w-[640px] overflow-y-auto rounded-t-[18px] bg-surface px-[18px] pt-[18px] shadow-xl"
         style={{
           maxHeight,

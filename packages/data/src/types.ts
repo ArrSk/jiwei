@@ -14,6 +14,7 @@ import type {
   Period,
   Semester,
 } from '@jiwei/core'
+import type { CourseImportResult, CourseImportRow } from './courseImport'
 
 /** 当前使用的存储引擎标识，写入 Meta 表，供将来迁移时检测 */
 export type StorageEngineKind = 'dexie' | 'sqlite'
@@ -102,6 +103,9 @@ export interface Repos {
   alerts: AlertRepo
   notes: NoteRepo
   meta: MetaRepo
+
+  /** 确认后的课程导入：重新校验/去重，课程与派生课次在同一事务提交，失败不改库。 */
+  importCourses(semesterId: string, rows: CourseImportRow[]): Promise<CourseImportResult>
 
   /**
    * 幂等重建整个学期的 Occurrence（docs/ARCHITECTURE.md 4.3 第 4 条）。
