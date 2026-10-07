@@ -80,7 +80,13 @@ export function CourseList({ courses, onDelete, onLoadDemo, onBatchEdit }: Props
                 ? `周${WEEKDAY_LABELS[anchor.weekday - 1]} 第 ${anchor.periods[0]}-${anchor.periods[1]} 节`
                 : anchor.type === 'absolute'
                   ? anchor.start.slice(0, 16).replace('T', ' ')
-                  : anchor.date
+                  : anchor.type === 'allDay'
+                    ? anchor.date
+                    : anchor.type === 'range'
+                      ? `${anchor.start} 至 ${anchor.end}`
+                      : anchor.type === 'weekly'
+                        ? '每周重复'
+                        : '长期计划'
             const weeks =
               anchor.type === 'curriculum' ? formatWeeks(anchor.weeks) || '每周' : '单次'
 

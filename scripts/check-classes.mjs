@@ -2,7 +2,7 @@
  * 检查构建产物 CSS 里是否真的生成了指定的工具类。
  *
  * 为什么需要它：本项目踩过两次"源码里写了类名、产物里没有"的坑
- * （见 docs/DESIGN-VERSIONS.md 第八节：Tailwind 对跨包源码的扫描不可靠）。
+ * （见 docs/history/DESIGN-VERSIONS.md 第八节：Tailwind 对跨包源码的扫描不可靠）。
  * 改完 UI 后跑一遍，比在浏览器里肉眼确认更早发现问题。
  *
  * 用法： node scripts/check-classes.mjs "max-w-[640px]" "min-h-[44px]" ...

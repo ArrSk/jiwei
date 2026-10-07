@@ -156,6 +156,10 @@ export function defaultScheduleConfig(): ScheduleConfig {
 export const BlockKind = z.enum(['course', 'event', 'task', 'exam'])
 export type BlockKind = z.infer<typeof BlockKind>
 
+/** 计划模块对事项的语义分类；不影响旧的 kind 字段，便于未来兼容待办模块。 */
+export const PlanType = z.enum(['deadline', 'longterm', 'range', 'weekly', 'event'])
+export type PlanType = z.infer<typeof PlanType>
+
 /**
  * 时间锚点。
  * - `curriculum`：教学语境。时刻不写在这里，由 `Period` 表派生，所以只有 weekday + 节次 + 教学周。
@@ -181,6 +185,27 @@ export const BlockAnchor = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('allDay'),
     date: DateStr,
+  }),
+  z.object({
+    type: z.literal('floating'),
+  }),
+  z.object({
+    type: z.literal('deadline'),
+    date: DateStr,
+    time: TimeStr.optional(),
+  }),
+  z.object({
+    type: z.literal('range'),
+    start: DateStr,
+    end: DateStr,
+  }).refine((value) => value.end >= value.start, { message: '结束日期不能早于开始日期' }),
+  z.object({
+    type: z.literal('weekly'),
+    weekdays: z.array(Weekday).min(1),
+    startDate: DateStr,
+    until: DateStr.optional(),
+    startTime: TimeStr.optional(),
+    endTime: TimeStr.optional(),
   }),
 ])
 export type BlockAnchor = z.infer<typeof BlockAnchor>
@@ -228,6 +253,10 @@ export const Block = z.object({
   detail: BlockDetail.optional(),
   /** 仅 kind 为 task 时有意义 */
   done: z.boolean().optional(),
+  /** 计划模块的细分类别；旧课程和旧日程没有此字段也完全兼容。 */
+  planType: PlanType.optional(),
+  /** 每周事项按日期记录完成状态，避免一次打勾把未来每周都标成完成。 */
+  completedDates: z.array(DateStr).optional(),
   createdAt: DateTimeStr,
   updatedAt: DateTimeStr,
 })
@@ -307,7 +336,7 @@ export type Adjustment = z.infer<typeof Adjustment>
 export const AlertOwnerType = z.enum(['occurrence', 'block', 'semester', 'note'])
 export type AlertOwnerType = z.infer<typeof AlertOwnerType>
 
-/** `mode='alarm'` 需要原生能力（Capacitor）；Web 端只提供 notify 与 ical。详见 docs/ALARM-STUDY.md */
+/** `mode='alarm'` 需要原生能力（Capacitor）；Web 端只提供 notify 与 ical。详见 docs/research/ALARM-STUDY.md */
 export const AlertMode = z.enum(['notify', 'alarm'])
 export type AlertMode = z.infer<typeof AlertMode>
 

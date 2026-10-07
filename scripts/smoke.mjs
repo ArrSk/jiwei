@@ -10,7 +10,7 @@
  *   6. manifest 的 start_url 是相对路径、图标真的存在、iOS 图标标签已声明
  *
  * 为什么需要它：本项目踩过"源码里写了、产物里没有"的坑
- * （Tailwind 跨包扫描，见 docs/DESIGN-VERSIONS.md 第八节），
+ * （Tailwind 跨包扫描，见 docs/history/DESIGN-VERSIONS.md 第八节），
  * 也踩过"本地完全正常、部署到子目录就坏"的坑
  * （manifest.start_url 写成 `/`，iPhone 加到主屏幕后点开是 404）。
  * 跑一遍 3 秒，比在真机上肉眼确认更早发现问题。

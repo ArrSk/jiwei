@@ -112,6 +112,37 @@ export function materializeBlock(
     })
   }
 
+  if (anchor.type === 'floating') return []
+
+  if (anchor.type === 'deadline') {
+    const at = combineDateTime(anchor.date, anchor.time ?? '23:59')
+    return [makeOccurrence(block, anchor.date, at, at, undefined, 0)]
+  }
+
+  if (anchor.type === 'range') {
+    const from = anchor.start < semester.startDate ? semester.startDate : anchor.start
+    const semesterEnd = dateForWeek(semester, semester.totalWeeks, 7)
+    const to = anchor.end > semesterEnd ? semesterEnd : anchor.end
+    const dates: string[] = []
+    for (let cursor = from; cursor <= to; cursor = addDaysStr(cursor, 1)) dates.push(cursor)
+    return dates.map((date) => makeOccurrence(block, date, combineDateTime(date, '00:00'), combineDateTime(date, '23:59'), undefined, 0))
+  }
+
+  if (anchor.type === 'weekly') {
+    const semesterEnd = dateForWeek(semester, semester.totalWeeks, 7)
+    const until = anchor.until && anchor.until < semesterEnd ? anchor.until : semesterEnd
+    const from = anchor.startDate > semester.startDate ? anchor.startDate : semester.startDate
+    const dates: string[] = []
+    for (let cursor = from; cursor <= until; cursor = addDaysStr(cursor, 1)) {
+      if (anchor.weekdays.includes(isoWeekday(cursor))) dates.push(cursor)
+    }
+    return dates.map((date) => {
+      const start = anchor.startTime ?? '00:00'
+      const end = anchor.endTime ?? '23:59'
+      return makeOccurrence(block, date, combineDateTime(date, start), combineDateTime(date, end), undefined, 0)
+    })
+  }
+
   // allDay
   return [
     makeOccurrence(

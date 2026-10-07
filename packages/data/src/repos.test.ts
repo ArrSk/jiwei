@@ -107,6 +107,25 @@ describe('Block CRUD', () => {
     expect(courses[0]?.title).toBe('高等数学')
     expect(courses[0]?.detail?.teacher).toBe('张老师')
   })
+
+  it('savePlan 写入待办并为截止日生成可查询的派生记录', async () => {
+    const repos = freshRepos()
+    await bootstrap(repos, { startDate: '2025-09-22' })
+    const task: Block = {
+      id: newId('blk'),
+      kind: 'task',
+      title: '提交作业',
+      planType: 'deadline',
+      anchor: { type: 'deadline', date: '2025-10-08' },
+      repeat: { mode: 'once' },
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    }
+    await repos.savePlan(task)
+    expect(await repos.blocks.listByKind('task')).toHaveLength(1)
+    const occurrences = await repos.occurrences.listAll()
+    expect(occurrences.filter((item) => item.blockId === task.id).map((item) => item.date)).toEqual(['2025-10-08'])
+  })
 })
 
 describe('rebuildOccurrences（幂等重建）', () => {

@@ -1,5 +1,5 @@
 /**
- * 能力适配层的契约（ADR-005 / docs/ALARM-STUDY.md）。
+ * 能力适配层的契约（ADR-005 / docs/research/ALARM-STUDY.md）。
  *
  * 铁律：业务代码**不得直接调用 Web API**（`new Notification()`、`navigator.vibrate()` …），
  * 一律经这里。原因很具体：闹钟必须走原生系统调度，如果 Web 调用散落在业务代码里，

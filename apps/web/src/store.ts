@@ -56,7 +56,7 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  activeModuleId: 'timetable',
+  activeModuleId: 'today',
   setActiveModuleId: (id) => set({ activeModuleId: id }),
 
   // 首页先展示今天；切走时顺手退出日视图。

@@ -1,7 +1,7 @@
 # 几微（jiwei）架构设计
 
 > 定位：**面向大学生的课程表应用**。首版只有课程表，但架构按"多模块长期演进"设计。
-> 本文档是唯一的技术权威；决策理由见 [`DECISIONS.md`](DECISIONS.md)，闹钟专题见 [`ALARM-STUDY.md`](ALARM-STUDY.md)。
+> 本文档是唯一的技术权威；决策理由见 [`DECISIONS.md`](DECISIONS.md)，闹钟专题见 [ALARM-STUDY.md](research/ALARM-STUDY.md)。
 
 ---
 
@@ -93,7 +93,7 @@ ESLint + Prettier + `tsc --noEmit` + Vitest（纯函数/数据层）+ Playwright
 | 震动 / 角标 / 后台任务 | ❌ | ❌ | ✅ |
 
 **因此**：`packages/platform` 暴露 `capabilities = { canAlarm, canBackgroundPush, canVibrate, canBadge, canFilesystem }`，
-并通过 `app` 适配器提供在线状态和 PWA 安装入口。UI 依据能力**降级展示**（Web 上"闹钟"按钮 → "提醒 + 加入系统日历"）。详细论证见 [`ALARM-STUDY.md`](ALARM-STUDY.md)。
+并通过 `app` 适配器提供在线状态和 PWA 安装入口。UI 依据能力**降级展示**（Web 上"闹钟"按钮 → "提醒 + 加入系统日历"）。详细论证见 [ALARM-STUDY.md](research/ALARM-STUDY.md)。
 
 ---
 
@@ -354,4 +354,11 @@ main.tsx
 | ADR-007 | 存储实现与访问接口分离（仓储模式） | ✅ |
 | ADR-010 | 官方模块按需启用；AI 只生成待确认草稿 | ✅ |
 
-**前置设计已全部确认**，无待定项。M2 手机可靠性与 M3 文件进出已在本地完成；下一步按 [`ROADMAP.md`](ROADMAP.md) 进入 M4 日程与官方模块开关。课程表图片 AI/OCR 仍放在后续可选阶段。
+**前置设计已全部确认**，无待定项。M2 手机可靠性、M3 文件进出和 M4 计划/官方模块开关已在本地完成；计划模块扩展 `Block` 锚点支持截止、长期、区间和每周语义，模块偏好写入 `meta` 并随备份保存。课程表图片 AI/OCR 仍放在后续可选阶段。
+## 11. 产品与实现边界（2026-10-07）
+
+- 核心体验是“今天工作台”：课程、计划和待办通过统一事项模型汇总到今天页；页面入口可以不同，但数据源和完成状态不能分叉。
+- 当前落地基础是 React/Vite/Tailwind/Zustand/Dexie/Zod、本地优先仓储、模块开关和示例数据。TanStack Query、路由库、SQLite、云同步、原生通知和插件运行时仍是候选方案。
+- 后续新增应用服务层，集中处理事项创建、完成、延期和导入；UI 只调用服务，不直接拼接数据库规则。只有在真实需求出现时再引入查询缓存、代码分包或远程同步。
+- AI 的第一阶段只生成候选数据，用户确认后才写入；必须记录来源、允许撤销，并在离线不可用时保持核心流程可用。
+- 面向职场扩展时使用工作/生活空间、项目关联和隐私边界复用核心模型，不把所有场景同时展示在首页。

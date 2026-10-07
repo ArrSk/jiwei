@@ -9,6 +9,7 @@ import {
   addDaysStr,
   isValidDateStr,
   materializeAll,
+  validatePlan,
   type Adjustment,
   type Alert,
   type Block,
@@ -195,6 +196,25 @@ export function createDexieRepos(db: JiweiDatabase): Repos {
     alerts: createAlertRepo(db),
     notes: createNoteRepo(db),
     meta: createMetaRepo(db),
+
+    async savePlan(block) {
+      validatePlan(block)
+      await db.transaction('rw', [db.semesters, db.periods, db.blocks, db.adjustments, db.occurrences], async () => {
+        const existing = await db.blocks.get(block.id)
+        if (existing?.kind === 'course' || existing?.anchor.type === 'curriculum') throw new Error('不能将课程覆盖为计划')
+        if (existing && existing.createdAt !== block.createdAt) throw new Error('编辑计划时必须保留创建时间')
+        await db.blocks.put(block)
+        // 清理旧日期的派生记录；再为所有相交学期生成新记录。
+        await db.occurrences.where('blockId').equals(block.id).delete()
+        const semesters = await db.semesters.toArray()
+        for (const semester of semesters) {
+          if (!belongsToSemester(block, semester.id, semester.startDate, endDateOf(semester))) continue
+          const periods = await db.periods.where('semesterId').equals(semester.id).toArray()
+          const rows = materializeSemesterRows([block], semester, periods, [])
+          if (rows.length) await db.occurrences.bulkPut(rows)
+        }
+      })
+    },
 
     async importCourses(semesterId, drafts) {
       return db.transaction('rw', [db.semesters, db.periods, db.blocks, db.adjustments, db.occurrences], async () => {
@@ -390,10 +410,20 @@ function assertDate(value: string, label: string): void {
 }
 
 function validateBlockDates(block: Block, semesterIds: Set<string>): void {
+  if (block.kind !== 'course' && block.anchor.type !== 'curriculum') validatePlan(block)
   if (block.anchor.type === 'curriculum') {
     if (!semesterIds.has(block.anchor.semesterId)) throw new Error(`课程 ${block.id} 引用了不存在的学期`)
-  } else if (block.anchor.type === 'allDay') {
+  } else if (block.anchor.type === 'allDay' || block.anchor.type === 'deadline') {
     assertDate(block.anchor.date, `课程 ${block.id} 的日期`)
+  } else if (block.anchor.type === 'floating') {
+    // 无日期的长期计划不需要日期校验。
+  } else if (block.anchor.type === 'range') {
+    assertDate(block.anchor.start, `事项 ${block.id} 的开始日期`)
+    assertDate(block.anchor.end, `事项 ${block.id} 的结束日期`)
+    if (block.anchor.end < block.anchor.start) throw new Error(`事项 ${block.id} 的结束日期早于开始日期`)
+  } else if (block.anchor.type === 'weekly') {
+    assertDate(block.anchor.startDate, `事项 ${block.id} 的开始日期`)
+    if (block.anchor.until) assertDate(block.anchor.until, `事项 ${block.id} 的重复结束日期`)
   } else {
     assertDate(block.anchor.start.slice(0, 10), `事项 ${block.id} 的开始日期`)
     assertDate(block.anchor.end.slice(0, 10), `事项 ${block.id} 的结束日期`)
@@ -414,7 +444,10 @@ function belongsToSemester(
   end: string,
 ): boolean {
   if (block.anchor.type === 'curriculum') return block.anchor.semesterId === semesterId
-  if (block.anchor.type === 'allDay') return block.anchor.date >= start && block.anchor.date <= end
+  if (block.anchor.type === 'allDay' || block.anchor.type === 'deadline') return block.anchor.date >= start && block.anchor.date <= end
+  if (block.anchor.type === 'floating') return false
+  if (block.anchor.type === 'range') return block.anchor.end >= start && block.anchor.start <= end
+  if (block.anchor.type === 'weekly') return !block.anchor.until || block.anchor.until >= start
   const date = block.anchor.start.slice(0, 10)
   return date >= start && date <= end
 }

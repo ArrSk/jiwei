@@ -3,6 +3,7 @@ import type { Semester } from '@jiwei/core'
 import { useJiwei } from '../JiweiContext'
 import { CourseImportSettings } from './CourseImportSettings'
 import { ScheduleSettings } from './ScheduleSettings'
+import { CloseButton } from './CloseButton'
 
 /** 只放课表专属配置；入口位于课程表顶部的小日历按钮。 */
 export function TimetableSettingsPage({ onClose, onManageSemesters }: {
@@ -24,9 +25,9 @@ export function TimetableSettingsPage({ onClose, onManageSemesters }: {
         className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-surface px-4 pt-4 shadow-xl sm:max-w-md sm:rounded-2xl"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="sheet-scroll-header -mx-4 mb-3 flex items-center justify-between px-4 pb-3">
           <h2 className="text-sm font-semibold">课表设置</h2>
-          <button type="button" className="rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-alt" onClick={onClose}>关闭</button>
+          <CloseButton onClose={onClose} />
         </div>
 
         <section className="mb-4">

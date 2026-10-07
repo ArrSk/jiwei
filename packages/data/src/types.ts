@@ -107,6 +107,9 @@ export interface Repos {
   /** 确认后的课程导入：重新校验/去重，课程与派生课次在同一事务提交，失败不改库。 */
   importCourses(semesterId: string, rows: CourseImportRow[]): Promise<CourseImportResult>
 
+  /** 计划与其派生课次一起提交；失败不保留半次编辑。 */
+  savePlan(block: Block): Promise<void>
+
   /**
    * 幂等重建整个学期的 Occurrence（docs/ARCHITECTURE.md 4.3 第 4 条）。
    *

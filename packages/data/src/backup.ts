@@ -2,7 +2,7 @@
  * 全量备份与恢复。
  *
  * 为什么必须有它：本项目按 ADR-002 是**本地优先、无服务器**，数据只存在用户的浏览器里。
- * 而调研（docs/MOBILE-ARCHITECTURE.md 第五节）确认 iOS 上 IndexedDB 可能
+ * 而调研（docs/research/移动端存储与调试研究.md 第五节）确认 iOS 上 IndexedDB 可能
  * **静默丢失数据**（WebKit #277615，Dexie 作者本人确认无法绕过）。
  * 在迁移到原生 SQLite（M5）之前，**可导出的 JSON 备份是唯一的兜底**。
  *

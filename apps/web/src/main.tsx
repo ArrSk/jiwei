@@ -4,6 +4,7 @@ import './styles.css'
 import { App } from './App'
 import { JiweiProvider } from './JiweiContext'
 import { AppearanceProvider } from './shell/AppearanceContext'
+import { ModuleProvider } from './ModuleContext'
 
 const container = document.getElementById('root')
 if (!container) throw new Error('找不到 #root 容器')
@@ -11,7 +12,9 @@ if (!container) throw new Error('找不到 #root 容器')
 createRoot(container).render(
   <StrictMode>
     <JiweiProvider>
-      <AppearanceProvider><App /></AppearanceProvider>
+      <AppearanceProvider>
+        <ModuleProvider><App /></ModuleProvider>
+      </AppearanceProvider>
     </JiweiProvider>
   </StrictMode>,
 )

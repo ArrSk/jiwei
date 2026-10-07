@@ -15,6 +15,7 @@ import { useState } from 'react'
 import { WEEKDAY_LABELS } from '@jiwei/core'
 import { BLOCK_PALETTES } from '../../../lib/palette'
 import { parseWeeks } from '../../../lib/weeks'
+import { CloseButton } from '../../../shell/CloseButton'
 
 export interface CourseFormValue {
   title: string
@@ -139,9 +140,11 @@ export function CourseForm({
           paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
         }}
       >
-        <h3 className="mb-3.5 text-center text-base font-semibold">
-          {isEditing ? '编辑课程' : '添加课程'}
-        </h3>
+        <div className="sheet-scroll-header -mx-[18px] mb-3.5 flex items-center justify-between px-[18px] pb-3.5">
+          <span className="w-16" aria-hidden="true" />
+          <h3 className="text-base font-semibold">{isEditing ? '编辑课程' : '添加课程'}</h3>
+          <CloseButton onClose={onClose} />
+        </div>
 
         <Row label="课程名">
           <input

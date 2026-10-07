@@ -1,5 +1,7 @@
 # 课表设计版本与回退方法
 
+> 历史参考：记录当时的方案与环境，不代表现在仍存在同样问题。执行前核对当前代码和环境；当前开发入口见 [文档导航](../README.md)。
+
 > 设计改过几轮，每个版本都已打上 **git 标签**，回退不需要记 commit 哈希。
 >
 > **重要**：`design-first` 原来指向的提交 `4163576` 里，`TimetableGrid.tsx`
@@ -81,32 +83,6 @@ node scripts/check-encoding.mjs packages/ui/src/TimeGrid.tsx apps/web/src/featur
 # 2) 看效果（dev server 会热更新）
 pnpm dev
 ```
-
-下面是本文件早期版本的遗留说明，保留以解释 `design-first` 标签为何被重新指向。
-
----
-
-## 附：早期命令留档（标签已变更，勿直接使用）
-```
-
-> 初版**存在表头被课程块覆盖的 bug**。如果只想回到"小表头"的观感但不要 bug，
-> 更推荐：用 `design-solid`，然后只把表头字号调小（见第六节）。
-
----
-
-## 五、切完必须做两件事
-
-```powershell
-# 1) 类型检查 + 编码体检（切文件容易漏 import，也可能带进坏文件）
-pnpm typecheck
-node scripts/check-encoding.mjs packages/ui/src/TimeGrid.tsx apps/web/src/features/timetable/TimetablePage.tsx apps/web/src/features/timetable/components/TimetableGrid.tsx apps/web/src/features/timetable/components/CourseList.tsx apps/web/src/lib/demoCourses.ts
-
-# 2) 看效果（dev server 会自动热更新）
-pnpm dev
-```
-
-> `scripts/check-encoding.mjs` 会检查：BOM、替换字符、乱码字符、
-> **注释与标签被并到同一行**（这一项能直接找出语法损坏，本次就是靠它定位的）。
 
 ## 六、只想微调某一项（不用整体回退）
 

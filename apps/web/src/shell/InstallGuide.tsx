@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useJiwei } from '../JiweiContext'
+import { CloseButton } from './CloseButton'
 
 /** 浏览器没有安装按钮时仍能看到手动安装步骤。 */
 export function InstallGuide() {
@@ -52,8 +53,9 @@ export function InstallHelpSheet({ onClose }: { onClose: () => void }) {
       <div role="dialog" aria-modal="true" aria-label="安装几微到桌面"
         className="max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-xl sm:max-w-md sm:rounded-2xl"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
-        <div className="mb-3 flex justify-end">
-          <button autoFocus type="button" className="min-h-[44px] rounded-lg border border-border px-3 text-sm" onClick={onClose}>关闭安装说明</button>
+        <div className="sheet-scroll-header -mx-4 mb-3 flex justify-end px-4 pb-3">
+          <h2 className="flex-1 self-center text-sm font-semibold">安装说明</h2>
+          <CloseButton onClose={onClose} label="关闭安装说明" />
         </div>
         <InstallGuide />
       </div>

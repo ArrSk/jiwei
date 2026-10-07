@@ -3,7 +3,7 @@
  *
  * 刻意把"Web 做不到的事"如实暴露：
  * - `canAlarm: false` —— 浏览器会冻结后台定时器，且 Web Push 无权响铃/震动/绕过静音。
- *   所以 Web 端的产品文案是"提醒"，不是"闹钟"（docs/ALARM-STUDY.md 第 6 节结论 2）。
+ *   所以 Web 端的产品文案是"提醒"，不是"闹钟"（docs/research/ALARM-STUDY.md 第 6 节结论 2）。
  * - `schedule()` 只是页面内定时器：页面关掉就不响，这也必须让用户知道。
  * 原生实现在 M5 用 Capacitor 补上，接口不变。
  */
@@ -23,7 +23,7 @@ function detectCapabilities(): Capabilities {
   const hasWindow = typeof window !== 'undefined'
   return {
     runtime: 'web',
-    // ★ 关键：Web 永远不能承诺闹钟。见 docs/ALARM-STUDY.md
+    // ★ 关键：Web 永远不能承诺闹钟。见 docs/research/ALARM-STUDY.md
     canAlarm: false,
     canBackgroundPush: false,
     canVibrate: hasWindow && 'vibrate' in navigator,
@@ -221,8 +221,9 @@ export function describeCapabilities(caps: Capabilities): Array<{ label: string;
     { label: '课程表', ok: true, note: '周视图 / 日视图，可增删改' },
     { label: '离线使用', ok: true, note: '本地优先，数据存在本机' },
     { label: '备份与恢复', ok: true, note: '导出/导入 JSON 文件' },
-    { label: '日程表', ok: false, note: '计划中（M4）' },
-    { label: '待办与笔记', ok: false, note: '计划中（M5 / M7）' },
+    { label: '计划', ok: true, note: '截止、长期、区间和每周事项' },
+    { label: '待办', ok: true, note: '截止日期、长期事项、完成和逾期提示' },
+    { label: '记账与笔记', ok: false, note: '计划中（M5 / M7）' },
     { label: '应用内提醒', ok: false, note: '计划中（M6），页面开着才会响' },
     { label: '课程文件进出', ok: true, note: 'JSON / CSV / ICS，可先预览再写入' },
     { label: '系统日历文件 (iCal)', ok: true, note: '可导出 ICS 文件到系统日历' },
@@ -234,7 +235,7 @@ export function describeCapabilities(caps: Capabilities): Array<{ label: string;
     {
       label: '闹钟（锁屏响铃）',
       ok: caps.canAlarm,
-      note: caps.canAlarm ? '可用' : 'Web 做不到，需原生 App（见 docs/ALARM-STUDY.md）',
+      note: caps.canAlarm ? '可用' : 'Web 做不到，需原生 App（见 docs/research/ALARM-STUDY.md）',
     },
   ]
 }

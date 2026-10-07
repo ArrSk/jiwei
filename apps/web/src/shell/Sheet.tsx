@@ -8,6 +8,7 @@
  * 之前每个弹层各写一份，改一次要改四处，必然漏。
  */
 import type { ReactNode } from 'react'
+import { CloseButton } from './CloseButton'
 
 interface Props {
   title: string
@@ -42,16 +43,10 @@ export function Sheet({ title, onClose, children, footer, headerExtra, maxHeight
           paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
         }}
       >
-        <div className="mb-3.5 flex items-center gap-2">
+        <div className="sheet-scroll-header -mx-[18px] mb-3.5 flex items-center gap-2 px-[18px] pb-3.5">
           <h3 className="flex-1 text-center text-base font-semibold">{title}</h3>
           {headerExtra}
-          <button
-            type="button"
-            className="shrink-0 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-alt"
-            onClick={onClose}
-          >
-            关闭
-          </button>
+          <CloseButton onClose={onClose} />
         </div>
 
         {children}

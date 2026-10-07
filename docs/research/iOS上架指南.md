@@ -1,5 +1,7 @@
 # 几微 · 在自己的 iPhone 上用，以及上架 App Store
 
+> 历史参考：记录当时的方案与环境，不代表现在仍存在同样问题。执行前核对当前代码和环境；当前开发入口见 [文档导航](../README.md)。
+
 > 目标：**先在我自己的 iPhone 上真实用起来**，之后再看要不要上架。
 >
 > 这份文档把"能用"和"上架"分成两条完全不同的路 —— 它们的成本和风险差很多，
@@ -59,7 +61,7 @@ WebKit 官方博客明确说明，**加到主屏幕的 Web App 有自己的"使�
 
 | 局限 | 说明 |
 | --- | --- |
-| **没有锁屏闹钟** | 这是浏览器的硬限制，见 [`ALARM-STUDY.md`](ALARM-STUDY.md)。想做闹钟必须走路线 B/C |
+| **没有锁屏闹钟** | 这是浏览器的硬限制，见 [ALARM-STUDY.md](ALARM-STUDY.md)。想做闹钟必须走路线 B/C |
 | App Store 里搜不到 | 不能分享给不熟的人 |
 | iOS 上有个 IndexedDB 的真风险 | 见第 2.2 节，**这是打包成 App 之前必须先解决的** |
 | 没有桌面小组件 | 想看"下一节课"还是得点开 |
@@ -80,7 +82,7 @@ WebKit 官方博客明确说明，**加到主屏幕的 Web App 有自己的"使�
 
 ### 2.1 技术方案：Capacitor
 
-项目在 [`ARCHITECTURE.md`](ARCHITECTURE.md) 与 ADR-005 / ADR-006 里已经定了：
+项目在 [`ARCHITECTURE.md`](../ARCHITECTURE.md) 与 ADR-005 / ADR-006 里已经定了：
 用 **Capacitor** 把 `apps/web` 的构建产物包进原生壳，**不重写 UI**。
 这是唯一能"网页和原生共用一套代码"的路径。
 
@@ -224,7 +226,7 @@ packages/data/src/engines/dexie/   →   新增 packages/data/src/engines/sqlite
 > 注释：接入第三方 SDK 意味着"应用会连接非 Apple 的服务器"，
 > 豁免的前提（不联网 / 只连 Apple）就不再成立。
 
-这条纪律和 [`产品分析.md`](产品分析.md) 第 4 节里"**不接入任何第三方统计 SDK**"是同一个决定，
+这条纪律和 [产品与商业化研究.md](产品与商业化研究.md#商业研究) 第 4 节里"**不接入任何第三方统计 SDK**"是同一个决定，
 也和 ADR-002（不做服务器）一致。**一个决定同时满足隐私、合规、成本三件事** ——
 这是这个项目架构上最划算的一笔。
 
@@ -265,7 +267,7 @@ packages/data/src/engines/dexie/   →   新增 packages/data/src/engines/sqlite
 
 几微决定"**不做教务抓取、不索要教务账号密码**"，这在审核上反而是**加分项**：
 不需要解释"我们为什么要用户提供学校账号"，也就没有那条最容易被拒的合规风险
-（学校已公开声明这类行为涉嫌违法，见 [`产品分析.md`](产品分析.md) 第 1.4 节）。
+（学校已公开声明这类行为涉嫌违法，见 [产品与商业化研究.md](产品与商业化研究.md#商业研究) 第 1.4 节）。
 
 ---
 
@@ -281,7 +283,7 @@ packages/data/src/engines/dexie/   →   新增 packages/data/src/engines/sqlite
 
 ### 关于 iCal 订阅的一个补充
 
-[`产品分析.md`](产品分析.md) 建议把 **iCal 订阅**提到最前，作为"没有闹钟"的低成本替代。
+[产品与商业化研究.md](产品与商业化研究.md#商业研究) 建议把 **iCal 订阅**提到最前，作为"没有闹钟"的低成本替代。
 这个建议在**原生化之后可以升级**：
 
 | 场景 | 做法 | 体验 |
@@ -327,10 +329,10 @@ packages/data/src/engines/dexie/   →   新增 packages/data/src/engines/sqlite
 
 **项目已有的调研（本仓库）**
 
-- [`正式版存储与调试调研.md`](正式版存储与调试调研.md) —— Capacitor 存储持久性、#277615 的完整证据链
-- [`ALARM-STUDY.md`](ALARM-STUDY.md) —— 为什么浏览器做不了闹钟、为什么选 Capacitor
-- [`MOBILE-ARCHITECTURE.md`](MOBILE-ARCHITECTURE.md) —— 手机端架构评估
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) ADR-003 / ADR-005 / ADR-006 / ADR-007
+- [移动端存储与调试研究.md](移动端存储与调试研究.md#存储与调试证据) —— Capacitor 存储持久性、#277615 的完整证据链
+- [ALARM-STUDY.md](ALARM-STUDY.md) —— 为什么浏览器做不了闹钟、为什么选 Capacitor
+- [移动端存储与调试研究.md](移动端存储与调试研究.md#移动端架构评估) —— 手机端架构评估
+- [`ARCHITECTURE.md`](../ARCHITECTURE.md) ADR-003 / ADR-005 / ADR-006 / ADR-007
 
 **社区实测记录（2026 年，非官方，但可作参考）**
 

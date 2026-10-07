@@ -12,9 +12,6 @@ import {
   describeAdjustment,
   findAdjustmentForOccurrence,
   isOccurrenceActive,
-  nextOccurrence,
-  nowIso,
-  ongoingOccurrences,
   today,
   weekdayOf,
   WEEKDAY_LABELS,
@@ -27,27 +24,22 @@ import {
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
-  CalendarIcon,
   PlusIcon,
-  SettingsIcon,
   type TimeGridColumn,
   type TimeGridRow,
 } from '@jiwei/ui'
 import { useJiwei } from '../../JiweiContext'
 import { useUiStore } from '../../store'
-import { buildDemoCourses } from '../../lib/demoCourses'
+import { loadDemoCourses } from '../../lib/demoData'
+import { DemoImportButton } from '../../shell/DemoImportButton'
 import { allWeeks } from '@jiwei/data'
 import { TimetableGrid, type PositionedBlock } from './components/TimetableGrid'
 import { CourseForm, emptyCourseForm, type CourseFormValue } from './components/CourseForm'
 import { CourseList } from './components/CourseList'
-import { TodayCard } from './components/TodayCard'
-import { TodayOverview } from './components/TodayOverview'
 import { DayView } from './components/DayView'
 import { AdjustSheet } from './components/AdjustSheet'
 import { BatchEditSheet } from './components/BatchEditSheet'
-import { SettingsPage } from '../../shell/SettingsPage'
 import { TimetableSettingsPage } from '../../shell/TimetableSettingsPage'
-import { InstallHelpSheet } from '../../shell/InstallGuide'
 import { SemesterSheet } from '../../shell/SemesterSheet'
 import { weeksToFormText, periodStartOf, parseWeeks } from '../../lib/weeks'
 
@@ -116,8 +108,8 @@ export function blockToFormValue(block: Block): CourseFormValue {
 }
 
 export function TimetablePage() {
-  const { repos, platform, refresh, dataVersion } = useJiwei()
-  const { semester, setSemester, week, setWeek, toast, view, setView, dayViewWeekday, setDayViewWeekday } =
+  const { repos, refresh, dataVersion } = useJiwei()
+  const { semester, setSemester, week, setWeek, toast, dayViewWeekday, setDayViewWeekday } =
     useUiStore()
 
   const [blocks, setBlocks] = useState<Block[]>([])
@@ -128,30 +120,13 @@ export function TimetablePage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   /** 正在编辑的课程 id；null 表示"新增" */
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [timetableSettingsOpen, setTimetableSettingsOpen] = useState(false)
-  const [installHelpOpen, setInstallHelpOpen] = useState(false)
   const [semesterSheetOpen, setSemesterSheetOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
   /** 正在调课/停课的那一次课（block + 具体场次） */
   const [adjusting, setAdjusting] = useState<{ block: Block; occ: Occurrence } | null>(null)
   const [adjustments, setAdjustments] = useState<Adjustment[]>([])
   const [form, setForm] = useState<CourseFormValue>(() => emptyCourseForm())
-  const [clockTick, setClockTick] = useState(0)
-
-  // “今天 / 下一节”必须随时间推进，也要在从后台回到前台时立即重算。
-  useEffect(() => {
-    const tick = () => setClockTick((value) => value + 1)
-    const timer = window.setInterval(tick, 30_000)
-    window.addEventListener('focus', tick)
-    document.addEventListener('visibilitychange', tick)
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('focus', tick)
-      document.removeEventListener('visibilitychange', tick)
-    }
-  }, [])
-
   /** 打开"新增"表单 */
   function openAdd(weekday?: number, periodIndex?: number): void {
     setEditingId(null)
@@ -203,7 +178,8 @@ export function TimetablePage() {
       ])
       if (!alive) return
       setBlocks(courseBlocks)
-      setOccurrences(occ)
+      const courseIds = new Set(courseBlocks.map((block) => block.id))
+      setOccurrences(occ.filter((item) => courseIds.has(item.blockId)))
       setPeriods(per)
       setAdjustments(adjs)
       setLoading(false)
@@ -249,21 +225,6 @@ export function TimetablePage() {
     }
     return out
   }, [occurrences, adjustments, blockById, semester, viewWeek])
-
-  /**
-   * 「今天 / 下一节」卡片的数据。
-   *
-   * 只在**正在看本周**时显示 —— 翻到第 8 周却提示"下一节是高数"会让人误以为
-   * 说的是本周的安排。时钟信号每 30 秒、回到前台和获得焦点时触发重算。
-   */
-  const todayCard = useMemo(() => {
-    if (viewWeek !== currentWeek) return null
-    const now = nowIso()
-    return {
-      ongoing: ongoingOccurrences(occurrences, now),
-      next: nextOccurrence(occurrences, now),
-    }
-  }, [occurrences, viewWeek, currentWeek, clockTick])
 
   /**
    * 日视图那一天的日期与场次（`dayViewWeekday` 为 null 时不用）。
@@ -368,9 +329,8 @@ export function TimetablePage() {
 
   async function handleLoadDemo(): Promise<void> {
     if (!semester) return
-    const demo = buildDemoCourses(semester)
-    for (const b of demo) await repos.blocks.put(b)
-    await persistAndReload(`已载入 ${demo.length} 门示例课程`)
+    const added = await loadDemoCourses(repos, semester.id)
+    await persistAndReload(added ? `已载入 ${added} 门示例课程` : '示例课程已经载入')
   }
 
   /**
@@ -427,21 +387,6 @@ export function TimetablePage() {
       用 h-full + flex 而不是让整页滚动 —— 这样底部页签才会**锁定**在屏幕底部。
     */
     <div className="reading-view flex h-full flex-col bg-canvas">
-      {/* “今天”跟随真实日期，课程表保留周次与编辑控件。 */}
-      {view === 'today' ? (
-        <header className="shrink-0 border-b border-border bg-surface px-3 py-2.5">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
-            {/* “今天”只看当天信息，不重复显示课程表页的学期切换控件。 */}
-            <div aria-hidden="true" />
-            <h1 className="text-[15px] font-semibold">今天</h1>
-            <div className="flex justify-end">
-              <button type="button" aria-label="设置" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt" onClick={() => setSettingsOpen(true)}>
-                <SettingsIcon className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </header>
-      ) : (
         <header className="shrink-0 bg-surface px-2 pb-1.5 pt-2">
           {/*
             三栏布局：左右各占 1fr、中间 auto。
@@ -510,18 +455,10 @@ export function TimetablePage() {
                 type="button"
                 aria-label="课表设置"
                 title="课表设置"
-                className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
+                className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface-alt"
                 onClick={() => setTimetableSettingsOpen(true)}
               >
-                <CalendarIcon className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                aria-label="设置"
-                className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-alt"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <SettingsIcon className="h-5 w-5" />
+                课表设置
               </button>
             </div>
           </div>
@@ -531,24 +468,12 @@ export function TimetablePage() {
             {semester.name} · 共 {semester.totalWeeks} 周 · {blocks.length} 门课 /{' '}
             {totalOccurrences} 次
           </div>
+          <div className="flex justify-center"><DemoImportButton scope="timetable" /></div>
         </header>
-      )}
 
       {/* ── 内容区：唯一可滚动的部分 ─────────────────────── */}
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {view === 'today' ? (
-          <TodayOverview
-            semester={semester}
-            occurrences={occurrences}
-            blocks={blocks}
-            app={platform.app}
-            onOpen={openEdit}
-            onAdjust={(block, occ) => setAdjusting({ block, occ })}
-            onGoTimetable={() => setView('timetable')}
-            onInstall={() => setInstallHelpOpen(true)}
-          />
-        ) : (
-          dayView ? (
+        {          dayView ? (
             /*
               日视图：一列铺满屏宽。
               顶部那行「周几 · 日期 · 返回整周」是唯一的出口 —— 手机上很容易
@@ -580,15 +505,6 @@ export function TimetablePage() {
             </>
           ) : (
             <>
-              {todayCard ? (
-                <TodayCard
-                  ongoing={todayCard.ongoing}
-                  next={todayCard.next}
-                  blockById={blockById}
-                  onOpen={openEdit}
-                />
-              ) : null}
-
               {blocks.length === 0 ? (
                 <div className="p-3">
                   <EmptyState onLoadDemo={handleLoadDemo} onAdd={() => setSheetOpen(true)} />
@@ -623,39 +539,10 @@ export function TimetablePage() {
                 />
               ) : null}
             </>
-          )
-        )}
+          )}
       </main>
 
       {/* ── 底部页签：锁定，始终可见 ─────────────────────── */}
-      <nav
-        className="shrink-0 border-t border-border bg-surface"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        <div className="mx-auto flex max-w-2xl">
-          {(
-            [
-              ['today', '今天'],
-              ['timetable', '课程表'],
-            ] as const
-          ).map(([key, label]) => {
-            const active = view === key
-            return (
-              <button
-                key={key}
-                type="button"
-                className={
-                  'min-h-[52px] flex-1 text-[13px] transition-colors ' +
-                  (active ? 'font-semibold text-brand' : 'text-muted')
-                }
-                onClick={() => setView(key)}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-      </nav>
 
       {sheetOpen ? (
         <CourseForm
@@ -699,22 +586,12 @@ export function TimetablePage() {
         <SemesterSheet onClose={() => setSemesterSheetOpen(false)} active={semester} />
       ) : null}
 
-      {installHelpOpen ? <InstallHelpSheet onClose={() => setInstallHelpOpen(false)} /> : null}
       {timetableSettingsOpen ? (
         <TimetableSettingsPage
           onClose={() => setTimetableSettingsOpen(false)}
           onManageSemesters={() => {
             setTimetableSettingsOpen(false)
             setSemesterSheetOpen(true)
-          }}
-        />
-      ) : null}
-      {settingsOpen ? (
-        <SettingsPage
-          onClose={() => setSettingsOpen(false)}
-          onOpenTimetableSettings={() => {
-            setSettingsOpen(false)
-            setTimetableSettingsOpen(true)
           }}
         />
       ) : null}

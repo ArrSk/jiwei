@@ -1,12 +1,12 @@
 # 几微 · jiwei
 
-> **面向大学生的课程表应用。** 手机优先、离线可用、数据只存在你自己设备上。
+> **面向大学生的个人“今天工作台”。** 以课程表为入口，逐步扩展到计划、待办、收支和笔记；手机优先、离线可用、数据先保存在你自己的设备上。
 
 **在线体验** → <https://arrsk.github.io/jiwei/>
 手机上打开后可以直接「添加到主屏幕」，当原生 App 一样用。
 
 ![状态](https://img.shields.io/badge/状态-M3%20数据进出-success)
-![测试](https://img.shields.io/badge/单元测试-154%20通过-success)
+![测试](https://img.shields.io/badge/单元测试-162%20通过-success)
 ![许可](https://img.shields.io/badge/许可-MIT-blue)
 
 ---
@@ -22,7 +22,7 @@
 - **一套代码同时覆盖电脑浏览器、手机浏览器、手机桌面**
 - **离线完整可用**（地铁里、断网时照样看课表）
 
-首页打开就能看到今天的日期、正在上的课、下一节课和当天课程列表；底部只显示“今天”和“课程表”，日程等扩展模块后续上线时再加入入口。
+首页打开就能看到今天的日期、正在上的课、下一节课和当天课程列表；计划、待办等模块可以按需开启，暂时不用的功能不会挤满界面。
 
 ---
 
@@ -106,7 +106,9 @@
 | **备份与恢复** | 导出/导入 JSON，换设备也能带走 | ✅ |
 | **课程文件进出** | CSV / ICS 导入导出，先预览再写入 | ✅ |
 | **离线与存储保护** | PWA 缓存、离线提示、持久化申请、用量查看 | ✅ |
-| 日程表 / 笔记 / 待办 | — | ⏭ 计划中 |
+| **计划** | 截止、长期、区间、每周事项和今天首页汇总 | ✅ |
+| 待办 | 截止日期、长期事项、完成和逾期提示 | ✅ |
+| 记账 / 笔记 | — | ⏭ 计划中 |
 | **闹钟（锁屏响铃）** | — | ❌ **浏览器做不到**，见上方说明 |
 
 </details>
@@ -125,7 +127,7 @@
 | 前端 | React 19 · Vite 7 · Tailwind CSS v4 · Zustand |
 | 本地存储 | IndexedDB（Dexie 封装），藏在仓储接口后面 |
 | 数据契约 | Zod 定义模型 + 时间计算纯函数（前后端共用的唯一真相） |
-| 测试 | Vitest（单元 154 个）· 自建冒烟检查（构建产物 23 项） |
+| 测试 | Vitest（单元测试）· 自建冒烟检查（构建产物 23 项） |
 | 部署 | GitHub Actions → GitHub Pages |
 | 原生（计划） | Capacitor，复用同一份 `apps/web` 代码 |
 
@@ -148,7 +150,7 @@ packages/platform ─────► 能力适配（通知/闹钟/存储/文件�
 3. **存储引擎可替换**：业务代码只依赖 `packages/data` 暴露的仓储接口。
    将来从 IndexedDB 换到 SQLite 或接服务端同步，**只换一个入参**，业务代码零改动。
 
-详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 与 [`docs/DECISIONS.md`](docs/DECISIONS.md)（9 条决策记录，每条都写了"为什么"）。
+详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) 与 [`docs/DECISIONS.md`](docs/DECISIONS.md)（决策记录会持续补充，每条都写了“为什么”）。
 
 ## 本地开发
 
@@ -160,7 +162,7 @@ pnpm dev          # → http://localhost:5273/
 
 手机上看效果：`pnpm dev` 会打印 `Network:` 局域网地址，手机连同一 Wi-Fi 打开即可。
 
-> 第一次在本机折腾？跟 [`docs/新手使用说明.md`](docs/新手使用说明.md) 一步步做，
+> 第一次在本机折腾？跟 [`docs/使用说明.md`](docs/使用说明.md#本地运行) 一步步做，
 > 那份文档假设你不懂编程，命令都可以直接复制粘贴。
 
 ## 常用命令
@@ -169,7 +171,7 @@ pnpm dev          # → http://localhost:5273/
 pnpm dev                # 开发服务器（改代码自动刷新）
 pnpm build              # 打包到 apps/web/dist
 pnpm typecheck          # 类型检查（5 个包）
-pnpm test               # 单元测试（154 个）
+pnpm test               # 单元测试
 pnpm smoke              # 构建产物冒烟检查（23 项）
 pnpm status             # 一眼看清项目状态
 pnpm save "说明"        # 提交并推送到 GitHub
@@ -194,14 +196,15 @@ node scripts/install-retry.mjs 12           # 网络不稳时反复 install
 | **M0 · 最小可用课表** | ✅ 已完成并验证 |
 | **M1 · 课表完整版**（改课、日视图、多课表、调课停课、批量编辑） | ✅ 已完成 |
 | **M2 · 手机可靠性**（安装、离线、存储保护、字号/密度） · **M3 · 数据进出**（JSON/CSV/ICS） | ✅ 已完成本地开发与构建验收 |
-| M4~M8 日程 / 提醒 / 笔记 / 同步 | ⏭ 见 [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+| **M4 日程 / 官方模块开关** | ✅ 本地可用；见 [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+| M5~M8 待办 / 记账 / 笔记 / AI / 同步 | ⏭ 见 [`docs/项目介绍与规划.md`](docs/项目介绍与规划.md) 和 [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 **质量基线**（每次推送到 GitHub 都会自动跑一遍，**任何一步不过就拒绝发布**）：
 
 | 检查 | 结果 |
 | --- | --- |
 | 类型检查（5 个包） | ✅ 通过 |
-| 单元测试 | ✅ 154 / 154（core 78 + data 61 + web 15） |
+| 单元测试 | ✅ 最近一次本地检查通过（core + data + web） |
 | 生产构建 | ✅ 通过 |
 | 构建产物冒烟检查 | ✅ 23 / 23 |
 
@@ -219,15 +222,17 @@ node scripts/install-retry.mjs 12           # 网络不稳时反复 install
 | --- | --- | --- |
 | [`docs/HANDOVER.md`](docs/HANDOVER.md) | 接手维护的开发者 | 当前实测基线、代码导航、已确认问题与维护顺序 |
 | [`docs/使用说明.md`](docs/使用说明.md) | **完全不懂编程的人** | 怎么打开、每个功能怎么用、排错、名词对照 |
-| [`docs/新手使用说明.md`](docs/新手使用说明.md) | 想在电脑上自己跑起来的人 | 装 Node.js、启动、局域网访问、常见报错 |
+| [`docs/项目介绍与规划.md`](docs/项目介绍与规划.md) | **第一次了解项目的人** | 项目要解决什么问题、现在能做什么、以后怎么发展 |
+| [`docs/外行人技术与项目架构说明.md`](docs/外行人技术与项目架构说明.md) | **想知道技术怎么分工的人** | 不用懂代码也能看懂的技术和项目架构 |
+| [`docs/AI开发维护文档.md`](docs/AI开发维护文档.md) | 后续开发代理/维护者 | 接手顺序、分层纪律、数据安全和验证要求 |
+| [`docs/使用说明.md`](docs/使用说明.md#本地运行) | 想在电脑上自己跑起来的人 | 装 Node.js、启动、局域网访问、常见报错 |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 开发者 | 架构、数据模型、目录结构、风险 |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 开发者 | 9 条 ADR，每条写清"为什么" |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 开发者 | 技术决策记录，每条写清“为什么” |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | 所有人 | M0~M8 各阶段做什么 |
-| [`docs/DESIGN-VERSIONS.md`](docs/DESIGN-VERSIONS.md) | 开发者 | 界面改过几版、如何回退、踩过的坑 |
-| [`docs/ALARM-STUDY.md`](docs/ALARM-STUDY.md) | 决策参考 | 为什么浏览器做不了闹钟 |
-| [`docs/MOBILE-ARCHITECTURE.md`](docs/MOBILE-ARCHITECTURE.md) | 开发者 | 手机端架构评估与调试方案 |
-| [`docs/正式版存储与调试调研.md`](docs/正式版存储与调试调研.md) | 决策参考 | 打包成 App 后存储可靠性与调试（含出处） |
-| [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md) | 本机环境 | 网络/沙箱/编码等环境问题的诊断 |
+| [`docs/history/DESIGN-VERSIONS.md`](docs/history/DESIGN-VERSIONS.md) | 历史参考 | 界面旧版本与回退记录 |
+| [`docs/research/ALARM-STUDY.md`](docs/research/ALARM-STUDY.md) | 决策参考 | 为什么浏览器做不了闹钟 |
+| [`docs/research/移动端存储与调试研究.md`](docs/research/移动端存储与调试研究.md) | 决策参考 | 手机架构、存储与调试研究 |
+| [`docs/history/ENVIRONMENT.md`](docs/history/ENVIRONMENT.md) | 历史参考 | 网络、沙箱和编码问题的记录 |
 
 ## 开发约定
 

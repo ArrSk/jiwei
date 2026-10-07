@@ -101,9 +101,116 @@
     outline: 2px solid var(--color-brand);
     outline-offset: 1px;
   }
+
+  /* iOS Safari 会放大字号小于 16px 的表单控件；保持输入时视口稳定。 */
+  @media (max-width: 639px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
 }
 
 @layer components {
+  .module-page {
+    animation: module-enter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+
+  @keyframes module-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; }
+  }
+
+  .module-picker {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink);
+  }
+
+  .module-picker[open] {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .module-picker::backdrop {
+    background: rgb(0 0 0 / 0.3);
+  }
+
+  .module-picker-panel {
+    width: 100%;
+    max-width: 640px;
+    max-height: 85dvh;
+    overflow-y: auto;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    animation: picker-enter 180ms ease-out;
+  }
+
+  .module-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+    gap: 0.6rem;
+  }
+
+  .sheet-scroll-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+    backdrop-filter: blur(12px);
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .panel-close {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    margin: -4px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-muted);
+    transition: background-color 160ms, color 160ms;
+  }
+
+  .panel-close:hover, .panel-close:focus-visible {
+    background: var(--color-surface-alt);
+    color: var(--color-ink);
+  }
+
+  /* 字号规则需高于 text-xs / text-sm 工具类，覆盖所有手机和平板输入。 */
+  @media (hover: none), (max-width: 639px) {
+    input:not([type='checkbox']):not([type='radio']), select, textarea {
+      font-size: max(16px, 1rem);
+    }
+  }
+
+  @keyframes picker-enter {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (min-width: 640px) {
+    .module-picker-panel { margin-bottom: 76px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .module-page, .module-picker-panel { animation: none; }
+  }
+
   /*
    * 课表空白格。
    *

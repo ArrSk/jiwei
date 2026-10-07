@@ -4,7 +4,7 @@
  * 用途：给自动化检查（Playwright / 无头浏览器）提供一个稳定的地址。
  *
  * 为什么不用 `vite preview`：Vite 依赖 esbuild 的服务子进程，在本机受限沙箱下会
- * EPERM（见 docs/ENVIRONMENT.md 根因 R3）。构建产物是纯静态文件，
+ * EPERM（见 docs/history/ENVIRONMENT.md 根因 R3）。构建产物是纯静态文件，
  * 用 Node 内置 http 直接托管即可，**完全绕开构建工具**。
  *
  * 用法： node scripts/serve-dist.mjs [端口]
