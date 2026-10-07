@@ -359,3 +359,9 @@ pnpm smoke
 - 将 `scripts/verify.ps1` 转为 Windows PowerShell 可正确读取的 UTF-16LE 编码，保留其直接调用本地检查工具的行为。
 - 删除根目录中被 `.gitignore` 忽略的临时测试日志；未删除源码、依赖目录、版本库或用户浏览器数据。
 - 验证：文档链接检查 0 个缺失；`git diff --check` 通过；5 个包类型检查通过；core 80、data 65、web 17 测试通过；生产构建和 smoke 23/23 通过。未推送 GitHub。
+
+## 34. 2026-10-07：整理版已提交并部署
+
+- 提交 `922902f` 已推送到 `origin/main`，提交作者为 `Jiwei Project <jiwei@users.noreply.github.com>`，没有写入本机个人邮箱。
+- GitHub Actions 部署运行 [37603043146](https://github.com/ArrSk/jiwei/actions/runs/37603043146) 已成功完成。
+- 线上地址：<https://arrsk.github.io/jiwei/>；实测 HTTP 200，最新 JavaScript 资源包含今天、待办和示例数据内容。
